@@ -35,3 +35,13 @@ hermes plugins enable feynman_super_tutor
 ## 合规边界
 
 不要把盗版教材、盗版教辅或付费题库全文放入本项目。用户资料、学生隐私、错题数据和学习档案应留在用户自己的 Hermes profile 中。
+
+
+## 完整 Hermes / 节点引擎安装
+
+```bash
+hermes skills install https://raw.githubusercontent.com/xyxw1234-bot/feynman-ai-super-tutor/main/SKILL.md --yes --category education
+hermes plugins install xyxw1234-bot/feynman-ai-super-tutor/plugins/feynman_super_tutor --force --enable
+```
+
+飞书网关智能体需要新会话或受控重启后完整生效。安装完成后，智能体应主动向用户发送：已启用费曼AI超级学习导师、默认学习方式、可处理的资料范围、4 个使用示例。
