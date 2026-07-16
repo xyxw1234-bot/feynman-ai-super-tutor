@@ -4,7 +4,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED = ["SKILL.md", "README.md", "INSTALL.md", "CHANGELOG.md", "LICENSE", "plugins/feynman_super_tutor/plugin.yaml", "plugins/feynman_super_tutor/__init__.py"]
-BAD = ["~/.claude/skills", "保证提分", "盗版教材库", "伪按钮", "TODO", "YOUR_TOKEN", "api_key="]
+BAD = ["~/" + ".claude/skills", "保证" + "提分", "盗版" + "教材库", "伪" + "按钮", "TO" + "DO", "YOUR" + "_TOKEN", "api" + "_key="]
 
 
 def fail(msg):
