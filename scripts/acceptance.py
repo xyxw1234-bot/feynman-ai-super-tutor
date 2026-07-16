@@ -19,6 +19,8 @@ if not skill.startswith('---\n'): fail('SKILL.md frontmatter missing')
 if len(skill) > 100000: fail('SKILL.md too large')
 if 'name: feynman-ai-super-tutor' not in skill: fail('skill name wrong')
 if 'description:' not in skill: fail('description missing')
+if '## 零、自动安装与启用协议' not in skill: fail('auto install protocol missing')
+if 'hermes plugins install xyxw1234-bot/feynman-ai-super-tutor/plugins/feynman_super_tutor --force --enable' not in (ROOT/'README.md').read_text(encoding='utf-8') + (ROOT/'INSTALL.md').read_text(encoding='utf-8') + skill: fail('plugin install command missing')
 if '版权' not in skill or '未成年人' not in skill: fail('safety/copyright boundary missing')
 
 scan_files = []
