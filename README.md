@@ -65,6 +65,21 @@ hermes skills install https://raw.githubusercontent.com/xyxw1234-bot/feynman-ai-
 我是老师，帮我设计一组能暴露学生误区的课堂追问。
 ```
 
+## 推荐给用户/智能体的一整段安装指令
+
+```text
+请读取并安装这个 Skill，安装后启用费曼AI超级学习导师。如果你运行在 Hermes / 节点引擎环境，请自动安装主 Skill，并在支持插件时安装启用配套插件；完成后主动给我发一段简短介绍和使用建议：https://raw.githubusercontent.com/xyxw1234-bot/feynman-ai-super-tutor/main/SKILL.md
+```
+
+## Hermes 命令行安装
+
+```bash
+hermes skills install https://raw.githubusercontent.com/xyxw1234-bot/feynman-ai-super-tutor/main/SKILL.md --yes --category education
+hermes plugins install xyxw1234-bot/feynman-ai-super-tutor/plugins/feynman_super_tutor --force --enable
+```
+
+网关/飞书智能体安装后需要进入新会话或受控重启 gateway 才能完整加载新 Skill/插件。
+
 ## 可选 Hermes 插件
 
 仓库内提供 `plugins/feynman_super_tutor/`，用于在 Hermes profile〔配置档案〕内本地保存学习档案、生成复习计划、将材料转为话题地图。插件不依赖外部服务器，不创建外部数据库，数据默认保存在当前用户自己的 Hermes profile 数据目录。
