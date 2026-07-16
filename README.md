@@ -14,10 +14,8 @@
 把下面 raw 链接发给支持 Skill 安装的智能体，让它读取并安装：
 
 ```text
-https://raw.githubusercontent.com/OWNER/feynman-ai-super-tutor/main/SKILL.md
+https://raw.githubusercontent.com/xyxw1234-bot/feynman-ai-super-tutor/main/SKILL.md
 ```
-
-发布到你的 GitHub 账号后，请把 `OWNER` 替换为实际账号名。
 
 ## 核心能力
 

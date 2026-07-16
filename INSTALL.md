@@ -5,7 +5,7 @@
 将以下链接发给支持 Hermes Skill 安装的智能体：
 
 ```text
-https://raw.githubusercontent.com/OWNER/feynman-ai-super-tutor/main/SKILL.md
+https://raw.githubusercontent.com/xyxw1234-bot/feynman-ai-super-tutor/main/SKILL.md
 ```
 
 告诉它：请读取并安装这个 Skill，安装后作为我的费曼AI超级学习导师工作。
@@ -13,7 +13,7 @@ https://raw.githubusercontent.com/OWNER/feynman-ai-super-tutor/main/SKILL.md
 ## 方式二：Hermes CLI〔命令行〕安装
 
 ```bash
-hermes skills install https://raw.githubusercontent.com/OWNER/feynman-ai-super-tutor/main/SKILL.md --yes
+hermes skills install https://raw.githubusercontent.com/xyxw1234-bot/feynman-ai-super-tutor/main/SKILL.md --yes
 ```
 
 ## 可选：安装插件
