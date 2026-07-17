@@ -1,62 +1,13 @@
 SAVE_LEARNING_CARD = {
     "name": "feynman_save_learning_card",
     "description": "Save a confirmed Feynman learning card into the current Hermes profile's local learning vault. Use after a learning session when the user has confirmed or clearly wants learning records saved.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "learner_id": {"type": "string", "description": "Optional learner label; default is 'default'. Do not include sensitive personal data."},
-            "subject": {"type": "string"},
-            "topic": {"type": "string"},
-            "grade": {"type": "string"},
-            "mastered": {"type": "array", "items": {"type": "string"}},
-            "misconceptions": {"type": "array", "items": {"type": "string"}},
-            "current_boundary": {"type": "string"},
-            "next_questions": {"type": "array", "items": {"type": "string"}},
-            "evidence": {"type": "array", "items": {"type": "string"}}
-        },
-        "required": ["subject", "topic"]
-    }
+    "parameters": {"type": "object", "properties": {"learner_id": {"type": "string", "description": "Optional learner label; default is default. Do not include sensitive personal data."}, "subject": {"type": "string"}, "topic": {"type": "string"}, "grade": {"type": "string"}, "mastered": {"type": "array", "items": {"type": "string"}}, "misconceptions": {"type": "array", "items": {"type": "string"}}, "current_boundary": {"type": "string"}, "next_questions": {"type": "array", "items": {"type": "string"}}, "evidence": {"type": "array", "items": {"type": "string"}}}, "required": ["subject", "topic"]}
 }
-
-READ_PROFILE = {
-    "name": "feynman_read_learning_profile",
-    "description": "Read a concise local learning profile summary for a learner, optionally filtered by subject or topic.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "learner_id": {"type": "string"},
-            "subject": {"type": "string"},
-            "topic": {"type": "string"},
-            "limit": {"type": "integer", "default": 10}
-        }
-    }
-}
-
-REVIEW_PLAN = {
-    "name": "feynman_generate_review_plan",
-    "description": "Generate a spaced review plan from saved learning cards and misconceptions.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "learner_id": {"type": "string"},
-            "subject": {"type": "string"},
-            "days": {"type": "integer", "default": 7}
-        }
-    }
-}
-
-INGEST_MATERIAL = {
-    "name": "feynman_ingest_material",
-    "description": "Turn user-provided legal text material into a topic map for Feynman learning. This does not fetch copyrighted resources; it only processes text the user provided or the agent legally retrieved.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "title": {"type": "string"},
-            "source": {"type": "string"},
-            "text": {"type": "string"},
-            "subject": {"type": "string"},
-            "grade": {"type": "string"}
-        },
-        "required": ["title", "text"]
-    }
-}
+READ_PROFILE = {"name": "feynman_read_learning_profile", "description": "Read a concise local learning profile summary for a learner, optionally filtered by subject or topic.", "parameters": {"type": "object", "properties": {"learner_id": {"type": "string"}, "subject": {"type": "string"}, "topic": {"type": "string"}, "limit": {"type": "integer", "default": 10}}}}
+REVIEW_PLAN = {"name": "feynman_generate_review_plan", "description": "Generate a spaced review plan from saved learning cards and misconceptions.", "parameters": {"type": "object", "properties": {"learner_id": {"type": "string"}, "subject": {"type": "string"}, "days": {"type": "integer", "default": 7}}}}
+INGEST_MATERIAL = {"name": "feynman_ingest_material", "description": "Turn user-provided legal text material into a topic map for Feynman learning. This does not fetch copyrighted resources; it only processes text the user provided or the agent legally retrieved.", "parameters": {"type": "object", "properties": {"title": {"type": "string"}, "source": {"type": "string"}, "text": {"type": "string"}, "subject": {"type": "string"}, "grade": {"type": "string"}}, "required": ["title", "text"]}}
+VISUAL_NEED_ASSESS = {"name": "feynman_assess_visual_need", "description": "Assess whether a learner's current math, physics, chemistry, biology, geography, or diagram-heavy question should be supported by a diagram, interactive H5 page, simulation, or game. Use before generating visual assets; do not overuse when text is enough.", "parameters": {"type": "object", "properties": {"subject": {"type": "string"}, "grade": {"type": "string"}, "topic": {"type": "string"}, "learner_message": {"type": "string"}, "observed_gap": {"type": "string"}, "last_attempts": {"type": "array", "items": {"type": "string"}}}, "required": ["topic", "learner_message"]}}
+INTERACTIVE_H5_BRIEF = {"name": "feynman_generate_interactive_h5_brief", "description": "Create a strict brief for a focused visual or interactive learning asset. Use when the agent will generate an H5 page, image, SVG, animation, or small interaction for the current learning point.", "parameters": {"type": "object", "properties": {"subject": {"type": "string"}, "grade": {"type": "string"}, "topic": {"type": "string"}, "learning_goal": {"type": "string"}, "learner_gap": {"type": "string"}, "asset_type": {"type": "string", "enum": ["image", "interactive_h5", "simulation", "game", "step_diagram"]}, "key_variables": {"type": "array", "items": {"type": "string"}}, "must_not_do": {"type": "array", "items": {"type": "string"}}}, "required": ["topic", "learning_goal", "learner_gap", "asset_type"]}}
+CREATE_INTERACTIVE_H5 = {"name": "feynman_create_interactive_h5", "description": "Generate a local standalone, mobile-first, light-background interactive H5 learning page for one focused concept. The agent must still preview, test, and deploy before sending a public link.", "parameters": {"type": "object", "properties": {"title": {"type": "string"}, "subject": {"type": "string"}, "grade": {"type": "string"}, "topic": {"type": "string"}, "learning_goal": {"type": "string"}, "interaction_type": {"type": "string", "enum": ["linear_function", "quadratic_function", "force_diagram", "buoyancy", "circuit", "chemistry_particles", "geometry_transform", "generic_slider"]}, "prompt_back": {"type": "string"}, "variables": {"type": "array", "items": {"type": "string"}}}, "required": ["title", "topic", "learning_goal", "interaction_type"]}}
+VISUAL_ASSET_CHECK = {"name": "feynman_check_visual_asset", "description": "Run a conservative static QA checklist on an HTML or H5 visual learning asset before the agent sends it to a learner. Browser and mobile preview are still required for public delivery.", "parameters": {"type": "object", "properties": {"file_path": {"type": "string"}, "subject": {"type": "string"}, "topic": {"type": "string"}, "expected_interactions": {"type": "array", "items": {"type": "string"}}}, "required": ["file_path"]}}
+LIST_VISUAL_ASSETS = {"name": "feynman_list_visual_assets", "description": "List locally generated Feynman visual or H5 assets for a learner, subject, or topic.", "parameters": {"type": "object", "properties": {"learner_id": {"type": "string"}, "subject": {"type": "string"}, "topic": {"type": "string"}, "limit": {"type": "integer", "default": 20}}}}

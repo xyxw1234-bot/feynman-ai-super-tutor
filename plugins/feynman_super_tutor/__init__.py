@@ -4,14 +4,22 @@ from . import schemas, tools
 
 
 def register(ctx):
-    ctx.register_tool(name="feynman_save_learning_card", toolset="feynman_super_tutor", schema=schemas.SAVE_LEARNING_CARD, handler=tools.feynman_save_learning_card)
-    ctx.register_tool(name="feynman_read_learning_profile", toolset="feynman_super_tutor", schema=schemas.READ_PROFILE, handler=tools.feynman_read_learning_profile)
-    ctx.register_tool(name="feynman_generate_review_plan", toolset="feynman_super_tutor", schema=schemas.REVIEW_PLAN, handler=tools.feynman_generate_review_plan)
-    ctx.register_tool(name="feynman_ingest_material", toolset="feynman_super_tutor", schema=schemas.INGEST_MATERIAL, handler=tools.feynman_ingest_material)
+    registrations = [
+        ("feynman_save_learning_card", schemas.SAVE_LEARNING_CARD, tools.feynman_save_learning_card),
+        ("feynman_read_learning_profile", schemas.READ_PROFILE, tools.feynman_read_learning_profile),
+        ("feynman_generate_review_plan", schemas.REVIEW_PLAN, tools.feynman_generate_review_plan),
+        ("feynman_ingest_material", schemas.INGEST_MATERIAL, tools.feynman_ingest_material),
+        ("feynman_assess_visual_need", schemas.VISUAL_NEED_ASSESS, tools.feynman_assess_visual_need),
+        ("feynman_generate_interactive_h5_brief", schemas.INTERACTIVE_H5_BRIEF, tools.feynman_generate_interactive_h5_brief),
+        ("feynman_create_interactive_h5", schemas.CREATE_INTERACTIVE_H5, tools.feynman_create_interactive_h5),
+        ("feynman_check_visual_asset", schemas.VISUAL_ASSET_CHECK, tools.feynman_check_visual_asset),
+        ("feynman_list_visual_assets", schemas.LIST_VISUAL_ASSETS, tools.feynman_list_visual_assets),
+    ]
+    for name, schema, handler in registrations:
+        ctx.register_tool(name=name, toolset="feynman_super_tutor", schema=schema, handler=handler)
 
-    # If the Skill is installed in this profile, expose it to plugin-aware builds
-    # without assuming a fixed repository layout. The public raw SKILL.md install
-    # remains the source of truth; plugin-only installs still provide tools.
+    # The plugin can be installed by subdirectory and must not assume a repository root.
+    # If the Skill has also been installed in this profile, expose it to plugin-aware runtimes.
     home = Path(os.environ.get("HERMES_HOME") or Path.home()).expanduser()
     candidates = [
         home / "skills" / "education" / "feynman-ai-super-tutor" / "SKILL.md",

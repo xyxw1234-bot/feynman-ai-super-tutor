@@ -1,8 +1,13 @@
 name: feynman_super_tutor
-version: 1.0.0
-description: Local learning vault tools for the Feynman AI Super Tutor Skill.
+version: "1.1.0"
+description: Local learning vault, visual-need assessment, and interactive H5 asset tools for the Feynman AI Super Tutor Skill.
 provides_tools:
   - feynman_save_learning_card
   - feynman_read_learning_profile
   - feynman_generate_review_plan
   - feynman_ingest_material
+  - feynman_assess_visual_need
+  - feynman_generate_interactive_h5_brief
+  - feynman_create_interactive_h5
+  - feynman_check_visual_asset
+  - feynman_list_visual_assets
