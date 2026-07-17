@@ -8,6 +8,7 @@ REQUIRED = [
     "plugins/feynman_super_tutor/plugin.yaml", "plugins/feynman_super_tutor/__init__.py",
     "plugins/feynman_super_tutor/schemas.py", "plugins/feynman_super_tutor/tools.py",
     "references/visual-interactive-learning.md", "templates/h5-brief.md",
+    "references/subject-training-and-resource-policy.md", "references/visual-asset-delivery-qa.md", "templates/practice-set.md",
 ]
 BAD = ["~/" + ".claude/skills", "保证" + "提分", "盗版" + "教材库", "伪" + "按钮", "TO" + "DO", "YOUR" + "_TOKEN", "api" + "_key="]
 
@@ -27,9 +28,13 @@ if len(skill) > 100000:
     fail("SKILL.md too large")
 for needle in [
     "name: feynman-ai-super-tutor",
-    "version: 1.1.0",
+    "version: 1.2.0",
     "## 零、自动安装与启用协议",
     "视觉互动增强协议",
+    "学科训练与提分增强协议",
+    "空白图片与假交付事故防线",
+    "feynman_map_subject_training",
+    "feynman_generate_practice_set",
     "feynman_assess_visual_need",
     "feynman_create_interactive_h5",
     "feynman_check_visual_asset",
@@ -64,6 +69,7 @@ required_schema_names = [
     "SAVE_LEARNING_CARD", "READ_PROFILE", "REVIEW_PLAN", "INGEST_MATERIAL",
     "VISUAL_NEED_ASSESS", "INTERACTIVE_H5_BRIEF", "CREATE_INTERACTIVE_H5",
     "VISUAL_ASSET_CHECK", "LIST_VISUAL_ASSETS",
+    "SUBJECT_MAP", "RESOURCE_LOOKUP", "PRACTICE_SET", "SAVE_PRACTICE_ATTEMPT",
 ]
 for name in required_schema_names:
     if not hasattr(schemas, name):
@@ -98,5 +104,18 @@ with tempfile.TemporaryDirectory() as td:
     assets = json.loads(tools.feynman_list_visual_assets({"topic": "浮力"}))
     if assets.get("count", 0) < 1:
         fail("asset listing failed")
+
+    mapped = json.loads(tools.feynman_map_subject_training({"learner_message": "初二物理浮力中考题我不会，尤其是图像和排开体积", "topic": "浮力"}))
+    if mapped.get("stage") != "初中" or mapped.get("subject") != "物理":
+        fail(f"subject training map failed: {mapped}")
+    lookup = json.loads(tools.feynman_plan_resource_lookup({"stage": "初中", "subject": "物理", "topic": "浮力", "exam_goal": "中考"}))
+    if not lookup.get("success") or not lookup.get("queries"):
+        fail("resource lookup planning failed")
+    practice = json.loads(tools.feynman_generate_practice_set({"stage": "初中", "subject": "物理", "topic": "浮力", "difficulty": "考试表达", "count": 2}))
+    if practice.get("copyright_status", "").find("原创") < 0 or len(practice.get("items", [])) < 2:
+        fail("practice generation failed")
+    attempt = json.loads(tools.feynman_save_practice_attempt({"subject": "物理", "topic": "浮力", "question_type": "实验探究题", "learner_answer": "浮力只和深度有关", "lost_points": ["混淆深度和排开体积"], "misconception": "认为越深浮力一定越大", "next_variant": "完全浸没后的变式", "review_priority": "高"}))
+    if not attempt.get("saved"):
+        fail("practice attempt save failed")
 
 print("PASS: package acceptance checks passed")

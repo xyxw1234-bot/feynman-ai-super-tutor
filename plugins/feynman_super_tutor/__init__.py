@@ -14,6 +14,10 @@ def register(ctx):
         ("feynman_create_interactive_h5", schemas.CREATE_INTERACTIVE_H5, tools.feynman_create_interactive_h5),
         ("feynman_check_visual_asset", schemas.VISUAL_ASSET_CHECK, tools.feynman_check_visual_asset),
         ("feynman_list_visual_assets", schemas.LIST_VISUAL_ASSETS, tools.feynman_list_visual_assets),
+        ("feynman_map_subject_training", schemas.SUBJECT_MAP, tools.feynman_map_subject_training),
+        ("feynman_plan_resource_lookup", schemas.RESOURCE_LOOKUP, tools.feynman_plan_resource_lookup),
+        ("feynman_generate_practice_set", schemas.PRACTICE_SET, tools.feynman_generate_practice_set),
+        ("feynman_save_practice_attempt", schemas.SAVE_PRACTICE_ATTEMPT, tools.feynman_save_practice_attempt),
     ]
     for name, schema, handler in registrations:
         ctx.register_tool(name=name, toolset="feynman_super_tutor", schema=schema, handler=handler)

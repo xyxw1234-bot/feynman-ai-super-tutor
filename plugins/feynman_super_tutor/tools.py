@@ -346,3 +346,124 @@ def feynman_list_visual_assets(args: dict, **kwargs) -> str:
         return json.dumps({"success": True, "count": len(rows), "assets": rows[-limit:]}, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+
+_STAGE_WORDS = {
+    "小学": ["小学", "一年级", "二年级", "三年级", "四年级", "五年级", "六年级"],
+    "初中": ["初中", "初一", "初二", "初三", "七年级", "八年级", "九年级", "中考"],
+    "高中": ["高中", "高一", "高二", "高三", "高考", "新高考"],
+}
+_SUBJECT_WORDS = {
+    "语文": ["语文", "阅读", "作文", "文言文", "现代文", "古诗", "病句"],
+    "数学": ["数学", "函数", "方程", "几何", "代数", "概率", "导数", "数列", "圆", "相似"],
+    "英语": ["英语", "完形", "阅读理解", "语法", "单词", "作文", "听力"],
+    "物理": ["物理", "力", "电路", "电压", "电流", "浮力", "压强", "光", "运动"],
+    "化学": ["化学", "反应", "方程式", "溶液", "酸碱", "离子", "实验", "物质"],
+    "生物": ["生物", "细胞", "遗传", "生态", "植物", "人体"],
+    "历史": ["历史", "朝代", "事件", "制度", "革命", "战争"],
+    "地理": ["地理", "地图", "气候", "地形", "人口", "区域", "经纬"],
+    "道德与法治/政治": ["道法", "政治", "法治", "宪法", "经济", "哲学", "公民"],
+}
+_QUESTION_TYPE_WORDS = {
+    "选择题": ["选择", "选项", "单选", "多选"],
+    "填空题": ["填空", "空格"],
+    "计算题": ["计算", "求", "列式", "方程"],
+    "实验探究题": ["实验", "探究", "控制变量", "现象"],
+    "图表题": ["图像", "图表", "曲线", "坐标", "地图"],
+    "阅读/材料题": ["阅读", "材料", "文本", "文段"],
+    "作文/表达题": ["作文", "写作", "表达", "论述"],
+}
+
+
+def _pick_by_words(text, mapping, default="未明确"):
+    for key, words in mapping.items():
+        if any(w in text for w in words):
+            return key
+    return default
+
+
+def _practice_path(learner_id: str) -> Path:
+    safe = re.sub(r"[^a-zA-Z0-9_\-\u4e00-\u9fff]", "_", learner_id or "default")[:64]
+    return _vault() / f"{safe}.practice_attempts.jsonl"
+
+
+def feynman_map_subject_training(args: dict, **kwargs) -> str:
+    try:
+        msg = " ".join(str(args.get(k, "")) for k in ["learner_message", "grade", "subject", "topic", "exam_goal"])
+        stage = args.get("grade") or _pick_by_words(msg, _STAGE_WORDS)
+        if stage not in _STAGE_WORDS and stage not in {"小学", "初中", "高中"}:
+            if any(x in stage for x in ["七", "八", "九", "初", "中考"]): stage = "初中"
+            elif any(x in stage for x in ["高", "高考"]): stage = "高中"
+            elif any(x in stage for x in ["一", "二", "三", "四", "五", "六", "小学"]): stage = "小学"
+        subject = args.get("subject") or _pick_by_words(msg, _SUBJECT_WORDS)
+        qtype = _pick_by_words(msg, _QUESTION_TYPE_WORDS, "待诊断题型")
+        topic = args.get("topic") or "待从对话/材料中细化"
+        exam_goal = args.get("exam_goal") or ("高考" if "高考" in msg else "中考" if "中考" in msg else "校内/阶段测评")
+        visual = "建议评估图示/H5" if any(w in msg for w in ["图", "函数", "几何", "电路", "浮力", "实验", "地图", "粒子"]) else "先文字费曼追问"
+        loop = ["先让学生讲第一反应", "定位知识点/题型/错因", "最小补强", "1题基础例题", "1题变式迁移", "错因卡", "下次复习任务"]
+        return json.dumps({"success": True, "stage": stage, "subject": subject, "topic": topic, "question_type": qtype, "exam_goal": exam_goal, "visual_strategy": visual, "training_loop": loop, "resource_policy": "官方公开资源只做索引和链接；用户合法材料可消化；版权不明题库不搬运；真题未核验时只生成原创变式。"}, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+
+
+def feynman_plan_resource_lookup(args: dict, **kwargs) -> str:
+    try:
+        stage, subject, topic = args.get("stage", ""), args.get("subject", ""), args.get("topic", "")
+        exam_goal, region = args.get("exam_goal", ""), args.get("region", "")
+        queries = [
+            f"国家中小学智慧教育平台 {stage} {subject} {topic}",
+            f"教育部 {stage} {subject} 课程标准 {topic}",
+        ]
+        if exam_goal:
+            queries.append(f"{region} {exam_goal} {subject} 样题 官方 PDF {topic}".strip())
+            queries.append(f"{exam_goal} {subject} 真题 官方 考试院 {topic}")
+        official_domains = ["basic.smartedu.cn", "smartedu.cn", "moe.gov.cn", "neea.edu.cn"]
+        if region:
+            official_domains.append("地方教育考试院/招生考试院官网，需人工或搜索确认域名")
+        return json.dumps({"success": True, "queries": queries, "preferred_sources": official_domains, "usage_rules": ["只保存标题、链接、来源、适用学段学科、少量摘要和学习建议", "不复制教材/教辅/题库全文", "公开真题需保留来源链接和年份地区", "来源不明题目改为原创变式并明确标注"], "next_step": "用搜索工具获取公开链接后，逐条判断来源可信度与授权边界。"}, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+
+
+def _math_practice(topic, difficulty, count):
+    qs=[]
+    if "一次函数" in topic or "函数" in topic:
+        base=[("已知 y=2x+3，求 x=1 时 y 的值。", "y=5", ["代入 x=1", "计算 2×1+3"]), ("直线 y=kx+b 经过点(0,3)，判断 b 的值。", "b=3", ["理解 b 是 y 轴截距"]), ("把 y=2x+1 改成 y=2x-3，图像发生什么变化？", "整体向下平移4个单位", ["斜率不变", "截距从1到-3"])]
+    else:
+        base=[(f"请用自己的话解释：{topic} 中最容易混淆的一个概念是什么？", "能说出定义、条件和反例", ["定义", "适用条件", "反例"])]
+    return base[:count]
+
+def _physics_practice(topic, difficulty, count):
+    if "浮力" in topic:
+        base=[("同一物体浸入同种液体更深，排开液体体积变大时，浮力如何变化？", "浮力变大，直到完全浸没后排开体积不再增加。", ["抓住 V排", "说明完全浸没边界"]), ("同一物体完全浸没在水和盐水中，哪种液体中浮力更大？为什么？", "盐水中更大，因为液体密度更大。", ["比较液体密度", "V排相同"]), ("原创考试表达题：解释 F浮=ρ液gV排 中每个量的现实含义。", "ρ液是液体密度，g为重力常量，V排为排开液体体积。", ["逐量解释", "不把物体体积和排开体积混淆"])]
+    else:
+        base=[(f"围绕{topic}，先判断题目要求的是概念、方向、大小还是变化关系。", "能说出判断依据。", ["对象", "条件", "规律"])]
+    return base[:count]
+
+def feynman_generate_practice_set(args: dict, **kwargs) -> str:
+    try:
+        subject = args.get("subject", "")
+        topic = args.get("topic", "")
+        difficulty = args.get("difficulty") or "基础"
+        count = max(1, min(6, int(args.get("count") or 3)))
+        if "数学" in subject:
+            base = _math_practice(topic, difficulty, count)
+        elif "物理" in subject:
+            base = _physics_practice(topic, difficulty, count)
+        else:
+            base = [(f"请围绕“{topic}”用自己的话讲核心概念，并举一个例子。", "概念准确，例子贴切，能说明适用边界。", ["核心概念", "例子", "边界"])]
+        items=[]
+        for i,(q,a,pts) in enumerate(base,1):
+            items.append({"id": i, "type": "原创变式题", "difficulty": difficulty, "question": q, "answer_key": a, "score_points": pts, "feynman_prompt": "先说你的思路，不要直接看答案；答完后解释为什么这样做。"})
+        return json.dumps({"success": True, "copyright_status": "原创生成，不声称真题；如需真题需另行核验官方来源链接。", "stage": args.get("stage", ""), "subject": subject, "topic": topic, "items": items}, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+
+
+def feynman_save_practice_attempt(args: dict, **kwargs) -> str:
+    try:
+        learner = (args.get("learner_id") or "default").strip() or "default"
+        rec = {"created_at": _now(), "learner_id": learner, "stage": args.get("stage", ""), "subject": args.get("subject", ""), "topic": args.get("topic", ""), "question_type": args.get("question_type", ""), "learner_answer": args.get("learner_answer", ""), "score_points": args.get("score_points") or [], "lost_points": args.get("lost_points") or [], "misconception": args.get("misconception", ""), "next_variant": args.get("next_variant", ""), "review_priority": args.get("review_priority", "中")}
+        _append_jsonl(_practice_path(learner), rec)
+        return json.dumps({"success": True, "saved": True, "topic": rec["topic"], "review_priority": rec["review_priority"], "attempt_count": len(_load_jsonl(_practice_path(learner)))}, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
