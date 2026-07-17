@@ -28,7 +28,7 @@ if len(skill) > 100000:
     fail("SKILL.md too large")
 for needle in [
     "name: feynman-ai-super-tutor",
-    "version: 1.3.4",
+    "version: 1.3.5",
     "## 零、自动安装与启用协议",
     "视觉互动增强协议",
     "学科训练与提分增强协议",
@@ -53,8 +53,8 @@ if "hermes plugins install xyxw1234-bot/feynman-ai-super-tutor/plugins/feynman_s
     fail("plugin install command missing")
 
 plugin_yaml = (ROOT / "plugins/feynman_super_tutor/plugin.yaml").read_text(encoding="utf-8")
-if 'version: "1.3.4"' not in plugin_yaml:
-    fail("plugin version not v1.3.4")
+if 'version: "1.3.5"' not in plugin_yaml:
+    fail("plugin version not v1.3.5")
 for tool_name in ["feynman_map_subject_training", "feynman_plan_resource_lookup", "feynman_check_resource_source",
     "feynman_align_curriculum_topic", "feynman_generate_learning_report", "feynman_generate_practice_set", "feynman_save_practice_attempt", "feynman_triage_broad_learning_goal", "feynman_plan_curriculum_lookup", "feynman_generate_subject_study_plan", "feynman_generate_exam_paper_blueprint"]:
     if tool_name not in plugin_yaml:

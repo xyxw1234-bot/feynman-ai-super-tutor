@@ -23,11 +23,11 @@ skill=(ROOT/'SKILL.md').read_text(encoding='utf-8')
 plugin=(ROOT/'plugins/feynman_super_tutor/plugin.yaml').read_text(encoding='utf-8')
 
 # 1. Public surface checks
-for needle in ['version: 1.3.4','超级学伴宽入口协议','学科训练与提分增强协议','轻问诊与高效提分体验协议','空白图片与假交付事故防线','视觉互动增强协议']:
+for needle in ['version: 1.3.5','超级学伴宽入口协议','学科训练与提分增强协议','轻问诊与高效提分体验协议','官方课程教材定位与知识点对齐协议','快速定位与性能协议','学习报告与阶段评估协议','空白图片与假交付事故防线','视觉互动增强协议']:
     check(needle in skill, f'SKILL missing {needle}')
 for bad in ['保证'+'提分','盗版'+'教材库','YOUR'+'_TOKEN','api'+'_key=','TO'+'DO']:
     check(bad not in skill, f'bad term in SKILL: {bad}')
-check('version: "1.3.4"' in plugin, 'plugin manifest not v1.3.4')
+check('version: "1.3.5"' in plugin, 'plugin manifest not v1.3.5')
 for tool_name in ['feynman_triage_broad_learning_goal','feynman_plan_curriculum_lookup','feynman_generate_subject_study_plan','feynman_generate_exam_paper_blueprint','feynman_check_resource_source','feynman_align_curriculum_topic','feynman_generate_learning_report','feynman_check_visual_asset']:
     check(tool_name in skill and tool_name in plugin, f'tool not public-listed: {tool_name}')
 
