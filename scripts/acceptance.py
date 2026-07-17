@@ -28,10 +28,10 @@ if len(skill) > 100000:
     fail("SKILL.md too large")
 for needle in [
     "name: feynman-ai-super-tutor",
-    "version: 1.3.0",
+    "version: 1.3.2",
     "## 零、自动安装与启用协议",
     "视觉互动增强协议",
-    "学科训练与提分增强协议",
+    "学科训练与考试学习增强协议",
     "空白图片与假交付事故防线",
     "超级学伴宽入口协议",
     "feynman_triage_broad_learning_goal",
@@ -53,9 +53,9 @@ if "hermes plugins install xyxw1234-bot/feynman-ai-super-tutor/plugins/feynman_s
     fail("plugin install command missing")
 
 plugin_yaml = (ROOT / "plugins/feynman_super_tutor/plugin.yaml").read_text(encoding="utf-8")
-if 'version: "1.3.0"' not in plugin_yaml:
-    fail("plugin version not v1.3.0")
-for tool_name in ["feynman_map_subject_training", "feynman_plan_resource_lookup", "feynman_generate_practice_set", "feynman_save_practice_attempt", "feynman_triage_broad_learning_goal", "feynman_plan_curriculum_lookup", "feynman_generate_subject_study_plan", "feynman_generate_exam_paper_blueprint"]:
+if 'version: "1.3.2"' not in plugin_yaml:
+    fail("plugin version not v1.3.2")
+for tool_name in ["feynman_map_subject_training", "feynman_plan_resource_lookup", "feynman_check_resource_source", "feynman_generate_practice_set", "feynman_save_practice_attempt", "feynman_triage_broad_learning_goal", "feynman_plan_curriculum_lookup", "feynman_generate_subject_study_plan", "feynman_generate_exam_paper_blueprint"]:
     if tool_name not in plugin_yaml:
         fail(f"plugin.yaml missing {tool_name}")
 
@@ -81,7 +81,7 @@ required_schema_names = [
     "VISUAL_NEED_ASSESS", "INTERACTIVE_H5_BRIEF", "CREATE_INTERACTIVE_H5",
     "VISUAL_ASSET_CHECK", "LIST_VISUAL_ASSETS",
     "SUBJECT_MAP", "RESOURCE_LOOKUP", "PRACTICE_SET", "SAVE_PRACTICE_ATTEMPT",
-    "BROAD_GOAL_TRIAGE", "STUDY_PLAN", "PAPER_BLUEPRINT", "CURRICULUM_LOOKUP_PLAN",
+    "BROAD_GOAL_TRIAGE", "STUDY_PLAN", "PAPER_BLUEPRINT", "CURRICULUM_LOOKUP_PLAN", "RESOURCE_SOURCE_CHECK",
 ]
 for name in required_schema_names:
     if not hasattr(schemas, name):
@@ -89,7 +89,7 @@ for name in required_schema_names:
 
 with tempfile.TemporaryDirectory() as td:
     os.environ["HERMES_HOME"] = td
-    r = json.loads(tools.feynman_save_learning_card({"subject": "数学", "topic": "一次函数", "mastered": ["会画图"], "misconceptions": ["斜率和截距混淆"], "current_boundary": "能背定义但变式不稳", "next_questions": ["一次函数图像为什么是一条直线？"]}))
+    r = json.loads(tools.feynman_save_learning_card({"subject": "数学", "topic": "一次函数", "mastered": ["会画图"], "misconceptions": ["斜率和截距混淆"], "current_boundary": "能背定义但变式不稳", "next_questions": ["一次函数图像为什么是一条直线？"], "user_confirmed": True}))
     if not r.get("success"):
         fail("save tool failed")
     prof = json.loads(tools.feynman_read_learning_profile({"subject": "数学"}))
@@ -98,9 +98,18 @@ with tempfile.TemporaryDirectory() as td:
     plan = json.loads(tools.feynman_generate_review_plan({"subject": "数学", "days": 3}))
     if len(plan.get("plan", [])) != 3:
         fail("review plan failed")
-    mat = json.loads(tools.feynman_ingest_material({"title": "测试材料", "text": "一次函数是形如y=kx+b的函数。它的图像是一条直线。k影响倾斜程度，b影响与y轴交点。"}))
+    mat = json.loads(tools.feynman_ingest_material({"title": "测试材料", "source_type": "用户原创", "user_has_rights": True, "text": "一次函数是形如y=kx+b的函数。它的图像是一条直线。k影响倾斜程度，b影响与y轴交点。"}))
     if not mat.get("success"):
         fail("ingest failed")
+    long_bad = json.loads(tools.feynman_ingest_material({"title": "整本教辅全部题目", "source_type": "不明", "text": "这是版权不明材料。" * 2000}))
+    if not long_bad.get("needs_rights_confirmation") and long_bad.get("error_code") not in {"rights_confirmation_required", "copyright_boundary"}:
+        fail("material copyright guard failed")
+    src = json.loads(tools.feynman_check_resource_source({"url": "https://basic.smartedu.cn/syncClassroom", "title": "国家中小学智慧教育平台"}))
+    if not src.get("verified_official"):
+        fail("source verification failed")
+    src2 = json.loads(tools.feynman_check_resource_source({"url": "https://example.com/some-paper", "title": "中考真题转载"}))
+    if src2.get("can_label_as_official_exam"):
+        fail("unverified source should not be official")
     assess = json.loads(tools.feynman_assess_visual_need({"subject": "物理", "topic": "浮力", "learner_message": "我不懂浮力和排开体积的关系", "observed_gap": "变量关系不清", "last_attempts": ["浮力就是往上"]}))
     if assess.get("recommended_asset") not in {"interactive_h5", "step_diagram_or_h5", "diagram"}:
         fail("visual assessment failed")
@@ -110,9 +119,13 @@ with tempfile.TemporaryDirectory() as td:
     generated = json.loads(tools.feynman_create_interactive_h5({"title": "浮力互动小实验", "subject": "物理", "topic": "浮力", "learning_goal": "观察液体密度和排开体积对浮力的影响", "interaction_type": "buoyancy"}))
     if not generated.get("success"):
         fail("h5 generation failed")
-    check = json.loads(tools.feynman_check_visual_asset({"file_path": generated["file_path"], "expected_interactions": ["rho", "vol"]}))
+    check = json.loads(tools.feynman_check_visual_asset({"file_path": generated["internal_only"]["file_path"], "expected_interactions": ["rho", "vol"]}))
     if not check.get("passed"):
         fail(f"h5 static check failed: {check}")
+    generic = json.loads(tools.feynman_create_interactive_h5({"title": "通用互动", "topic": "未知主题", "learning_goal": "测试", "interaction_type": "generic_slider"}))
+    generic_check = json.loads(tools.feynman_check_visual_asset({"file_path": generic["internal_only"]["file_path"]}))
+    if generic_check.get("passed") or not generic.get("requires_subject_customization"):
+        fail("generic H5 should not pass student-ready QA")
     assets = json.loads(tools.feynman_list_visual_assets({"topic": "浮力"}))
     if assets.get("count", 0) < 1:
         fail("asset listing failed")
@@ -126,7 +139,7 @@ with tempfile.TemporaryDirectory() as td:
     practice = json.loads(tools.feynman_generate_practice_set({"stage": "初中", "subject": "物理", "topic": "浮力", "difficulty": "考试表达", "count": 2}))
     if practice.get("copyright_status", "").find("原创") < 0 or len(practice.get("items", [])) < 2:
         fail("practice generation failed")
-    attempt = json.loads(tools.feynman_save_practice_attempt({"subject": "物理", "topic": "浮力", "question_type": "实验探究题", "learner_answer": "浮力只和深度有关", "lost_points": ["混淆深度和排开体积"], "misconception": "认为越深浮力一定越大", "next_variant": "完全浸没后的变式", "review_priority": "高"}))
+    attempt = json.loads(tools.feynman_save_practice_attempt({"subject": "物理", "topic": "浮力", "question_type": "实验探究题", "learner_answer": "浮力只和深度有关", "lost_points": ["混淆深度和排开体积"], "misconception": "认为越深浮力一定越大", "next_variant": "完全浸没后的变式", "review_priority": "高", "user_confirmed": True}))
     if not attempt.get("saved"):
         fail("practice attempt save failed")
 
@@ -139,7 +152,7 @@ with tempfile.TemporaryDirectory() as td:
     study = json.loads(tools.feynman_generate_subject_study_plan({"grade": "初二", "subject": "数学", "textbook_version": "人教版", "scope": "前三章", "goal_type": "期中", "days": 5, "daily_minutes": 40}))
     if len(study.get("daily_plan", [])) != 5 or study.get("goal_type") != "期中":
         fail("subject study plan failed")
-    paper = json.loads(tools.feynman_generate_exam_paper_blueprint({"grade": "七年级", "subject": "语文", "scope": "第一、二单元", "exam_type": "期中", "duration_minutes": 120, "total_score": 100}))
+    paper = json.loads(tools.feynman_generate_exam_paper_blueprint({"grade": "七年级", "subject": "语文", "textbook_version": "统编版", "scope": "第一、二单元", "exam_type": "期中", "duration_minutes": 120, "total_score": 100}))
     if not paper.get("success") or not paper.get("blueprint") or "不得伪称官方真题" not in paper.get("generation_rules", []):
         fail("exam paper blueprint failed")
 

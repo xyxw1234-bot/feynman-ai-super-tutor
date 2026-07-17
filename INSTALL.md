@@ -1,6 +1,6 @@
 # 安装说明
 
-适用版本：v1.3.0 超级学伴宽入口增强版。
+适用版本：v1.3.2 10万用户发布候选增强版。
 
 ## 方式一：给智能体发送 raw SKILL.md 链接
 
@@ -25,7 +25,7 @@ hermes plugins install xyxw1234-bot/feynman-ai-super-tutor/plugins/feynman_super
 
 飞书网关智能体需要新会话或受控重启后完整生效。普通用户不需要看到命令、路径或日志。
 
-## v1.1 插件能力
+## 插件能力概览
 
 插件提供学习卡、学习档案读取、材料话题地图、复习计划，以及可视化互动增强工具：视觉必要性判断、互动 H5 需求说明、H5 生成、H5 静态质检、视觉素材列表。
 
@@ -40,7 +40,7 @@ hermes plugins install xyxw1234-bot/feynman-ai-super-tutor/plugins/feynman_super
 不要把盗版教材、盗版教辅或付费题库全文放入本项目。用户资料、学生隐私、错题数据和学习档案应留在用户自己的 Hermes profile 中。
 
 
-## v1.2 安装后自检
+## 学科训练安装后自检
 
 安装后可以让智能体尝试：
 
@@ -63,4 +63,13 @@ hermes plugins install xyxw1234-bot/feynman-ai-super-tutor/plugins/feynman_super
 
 ```text
 帮我出一套七年级语文期中原创模拟卷，你先问清教材版本和范围。
+```
+
+
+## 固定版本安装入口
+
+面向大规模正式分发时，建议使用 tag 固定版本链接，避免 `main` 分支漂移。当前候选版本固定链接：
+
+```text
+https://raw.githubusercontent.com/xyxw1234-bot/feynman-ai-super-tutor/v1.3.2/SKILL.md
 ```

@@ -69,8 +69,17 @@ def _now():
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
+def _safe_fail(code="internal_error", message="操作失败，请稍后重试或改用文字学习。", **extra):
+    data = {"success": False, "error_code": code, "message": message}
+    data.update(extra)
+    return json.dumps(data, ensure_ascii=False)
+
+
+
 def feynman_save_learning_card(args: dict, **kwargs) -> str:
     try:
+        if args.get("user_confirmed") is not True:
+            return json.dumps({"success": False, "needs_confirmation": True, "message": "保存学习卡前需要用户明确确认。"}, ensure_ascii=False)
         learner = (args.get("learner_id") or "default").strip() or "default"
         card = {
             "created_at": _now(),
@@ -87,7 +96,7 @@ def feynman_save_learning_card(args: dict, **kwargs) -> str:
         _append_jsonl(_cards_path(learner), card)
         return json.dumps({"success": True, "saved": True, "topic": card["topic"], "card_count": len(_load_cards(learner))}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+        return _safe_fail()
 
 
 def feynman_read_learning_profile(args: dict, **kwargs) -> str:
@@ -110,7 +119,7 @@ def feynman_read_learning_profile(args: dict, **kwargs) -> str:
             next_q += c.get("next_questions") or []
         return json.dumps({"success": True, "learner_id": learner, "total_cards": len(cards), "recent_topics": [c.get("topic") for c in recent], "recent_misconceptions": misconceptions[-8:], "current_boundaries": boundaries[-5:], "next_questions": next_q[-8:]}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+        return _safe_fail()
 
 
 def feynman_generate_review_plan(args: dict, **kwargs) -> str:
@@ -133,7 +142,7 @@ def feynman_generate_review_plan(args: dict, **kwargs) -> str:
             plan.append({"day": i + 1, "focus_topics": [x for x in focus if x], "method": "先回讲2分钟，再做1个变式，再更新错因卡"})
         return json.dumps({"success": True, "days": days, "plan": plan}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+        return _safe_fail()
 
 
 def _sentences(text: str):
@@ -145,8 +154,15 @@ def feynman_ingest_material(args: dict, **kwargs) -> str:
     try:
         text = (args.get("text") or "").strip()
         title = (args.get("title") or "未命名材料").strip()
+        source_type = args.get("source_type") or "不明"
+        user_has_rights = args.get("user_has_rights") is True
         if len(text) < 20:
-            return json.dumps({"success": False, "error": "材料文本过短，无法生成话题地图"}, ensure_ascii=False)
+            return _safe_fail("material_too_short", "材料文本过短，无法生成话题地图。")
+        if len(text) > 12000 and (source_type in {"不明", ""} or not user_has_rights):
+            return _safe_fail("rights_confirmation_required", "材料较长，继续处理前需要确认来源合法且你有权用于学习整理。", needs_rights_confirmation=True, allowed_next=["只做少量摘要", "请提供官方链接/授权说明", "改为围绕主题生成原创练习"])
+        banned_material_requests = ["整本", "全册", "全部题目", "会员题库", "付费题库", "爬取"]
+        if any(w in title + args.get("source", "") for w in banned_material_requests) and not user_has_rights:
+            return _safe_fail("copyright_boundary", "不能整理或复制版权不明的整本教材、教辅或题库。可以改为学习路线、题型说明或原创变式。")
         chunks, cur, count = [], [], 0
         for s in _sentences(text):
             cur.append(s)
@@ -166,11 +182,11 @@ def feynman_ingest_material(args: dict, **kwargs) -> str:
                 freq[k] = freq.get(k, 0) + 1
             top = sorted(freq, key=lambda item: freq[item], reverse=True)[:5]
             topics.append({"index": idx, "topic_hint": first or (top[0] if top else f"话题{idx}"), "keywords": top, "feynman_prompt": f"请你用自己的话讲：{first or title} 到底在解决什么问题？", "approx_chars": len(ch)})
-        record = {"created_at": _now(), "title": title, "source": args.get("source", ""), "subject": args.get("subject", ""), "grade": args.get("grade", ""), "topics": topics}
+        record = {"created_at": _now(), "title": title, "source": args.get("source", ""), "source_type": source_type, "rights_confirmed": user_has_rights, "subject": args.get("subject", ""), "grade": args.get("grade", ""), "topics": topics}
         _append_jsonl(_material_path(), record)
         return json.dumps({"success": True, "title": title, "topic_count": len(topics), "topics": topics}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+        return _safe_fail()
 
 
 _VISUAL_KEYWORDS = {
@@ -206,7 +222,7 @@ def feynman_assess_visual_need(args: dict, **kwargs) -> str:
             reasons.append("已有明确学习断点")
         return json.dumps({"success": True, "visual_need": level, "recommended_asset": asset, "scores": scores, "reasons": reasons, "teacher_move": ask, "rule": "视觉素材只是帮助学生重新讲清楚的脚手架，不替代费曼回讲。"}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+        return _safe_fail()
 
 
 def feynman_generate_interactive_h5_brief(args: dict, **kwargs) -> str:
@@ -214,7 +230,7 @@ def feynman_generate_interactive_h5_brief(args: dict, **kwargs) -> str:
         topic = args.get("topic", "当前知识点")
         return json.dumps({"success": True, "asset_type": args.get("asset_type", "interactive_h5"), "title": f"{topic}｜费曼互动小实验", "learning_goal": args.get("learning_goal", "让学习者通过操作观察核心变量关系，并能用自己的话复述"), "learner_gap": args.get("learner_gap", "文字解释不足以形成稳定直观"), "design_rules": ["浅色背景，移动端优先，一屏看懂任务", "只围绕一个知识点，不做大而全页面", "必须有可操作控件、即时反馈、观察任务、回到聊天复述的问题", "不能出现内部路径、测试词、版权不明素材", "生成后先做静态检查、浏览器预览和移动端宽度检查，再发给学生"], "variables": args.get("key_variables") or [], "must_not_do": args.get("must_not_do") or ["不要替代学生思考", "不要把H5当最终答案", "不要未经测试直接发链接"], "return_to_feynman_prompt": f"看完后请回到聊天，用自己的话讲：{topic} 的关键关系是什么？"}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+        return _safe_fail()
 
 
 def _page(title: str, goal: str, body: str, script: str, prompt_back: str) -> str:
@@ -273,7 +289,7 @@ def feynman_create_interactive_h5(args: dict, **kwargs) -> str:
         grade = args.get("grade", "")
         goal = args.get("learning_goal") or "通过操作观察规律，再回到聊天用自己的话讲清楚。"
         it = args.get("interaction_type") or "generic_slider"
-        prompt = args.get("prompt_back") or f"请回到聊天，用自己的话讲：{topic} 的关键规律是什么？"
+        prompt = args.get("prompt_back") or f"请先拖动/点击页面上的控件观察变化，再回到聊天，用自己的话讲：{topic} 的关键规律是什么？"
         body, script = {
             "linear_function": _linear,
             "function_graph": _linear,
@@ -292,9 +308,10 @@ def feynman_create_interactive_h5(args: dict, **kwargs) -> str:
         meta = {"created_at": _now(), "asset_id": asset_id, "title": title, "subject": subject, "grade": grade, "topic": topic, "interaction_type": it, "file_path": str(html_path), "prompt_back": prompt, "status": "local_generated_needs_preview_and_public_deploy"}
         (d / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
         _append_jsonl(_asset_index_path(), meta)
-        return json.dumps({"success": True, "asset_id": asset_id, "file_path": str(html_path), "meta_path": str(d / "meta.json"), "next_required_steps": ["run feynman_check_visual_asset", "open the HTML in a real browser", "test phone width and all controls", "deploy to a stable public URL before sending", "ask the learner to return and explain observations"]}, ensure_ascii=False)
+        requires_customization = it not in {"linear_function", "function_graph", "quadratic_function", "buoyancy", "force_diagram", "circuit", "chemistry_particles"}
+        return json.dumps({"success": True, "asset_id": asset_id, "student_deliverable_ready": False, "public_url": None, "do_not_send_to_student": True, "requires_subject_customization": requires_customization, "internal_only": {"file_path": str(html_path), "meta_path": str(d / "meta.json"), "next_required_steps": ["run feynman_check_visual_asset", "open the HTML in a real browser", "test phone width and all controls", "deploy to a stable public URL before sending", "ask the learner to return and explain observations"]}}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+        return _safe_fail()
 
 
 def feynman_check_visual_asset(args: dict, **kwargs) -> str:
@@ -316,10 +333,12 @@ def feynman_check_visual_asset(args: dict, **kwargs) -> str:
         for k, v in checks.items():
             if not v:
                 errors.append(k)
-        banned = ["TO" + "DO", "仅供" + "测试", "127.0.0.1", "api" + "_key", "sec" + "ret", "trace" + "back"]
+        banned = ["TO" + "DO", "仅供" + "测试", "127.0.0.1", "file://", "/opt/data", "HERMES_HOME", "api" + "_key", "sec" + "ret", "trace" + "back", "browser_navigate", "write_file", "terminal"]
         for b in banned:
             if b in text:
                 errors.append(f"banned_text:{b}")
+        if "通用脚手架：正式发送前应按具体知识点改写" in text:
+            errors.append("generic_template_not_student_ready")
         if len(text) < 3500:
             warnings.append("html_may_be_too_short_for_rich_interaction")
         for e in args.get("expected_interactions") or []:
@@ -327,7 +346,7 @@ def feynman_check_visual_asset(args: dict, **kwargs) -> str:
                 warnings.append(f"expected_interaction_not_found:{e}")
         return json.dumps({"success": True, "passed": not errors, "checks": checks, "errors": errors, "warnings": warnings, "required_next": ["browser_preview", "mobile_width_preview", "subject_accuracy_review", "public_url_200_check"], "note": "Static check only. Public delivery requires browser/mobile preview and subject accuracy review."}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"success": False, "passed": False, "error": str(e)}, ensure_ascii=False)
+        return _safe_fail("visual_check_failed", "视觉素材检查失败，请先不要发送给学生。", passed=False)
 
 
 def feynman_list_visual_assets(args: dict, **kwargs) -> str:
@@ -345,7 +364,7 @@ def feynman_list_visual_assets(args: dict, **kwargs) -> str:
             rows = [r for r in rows if topic in r.get("topic", "")]
         return json.dumps({"success": True, "count": len(rows), "assets": rows[-limit:]}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+        return _safe_fail()
 
 _STAGE_WORDS = {
     "小学": ["小学", "一年级", "二年级", "三年级", "四年级", "五年级", "六年级"],
@@ -402,7 +421,7 @@ def feynman_map_subject_training(args: dict, **kwargs) -> str:
         loop = ["先让学生讲第一反应", "定位知识点/题型/错因", "最小补强", "1题基础例题", "1题变式迁移", "错因卡", "下次复习任务"]
         return json.dumps({"success": True, "stage": stage, "subject": subject, "topic": topic, "question_type": qtype, "exam_goal": exam_goal, "visual_strategy": visual, "training_loop": loop, "resource_policy": "官方公开资源只做索引和链接；用户合法材料可消化；版权不明题库不搬运；真题未核验时只生成原创变式。"}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+        return _safe_fail()
 
 
 def feynman_plan_resource_lookup(args: dict, **kwargs) -> str:
@@ -421,23 +440,29 @@ def feynman_plan_resource_lookup(args: dict, **kwargs) -> str:
             official_domains.append("地方教育考试院/招生考试院官网，需人工或搜索确认域名")
         return json.dumps({"success": True, "queries": queries, "preferred_sources": official_domains, "usage_rules": ["只保存标题、链接、来源、适用学段学科、少量摘要和学习建议", "不复制教材/教辅/题库全文", "公开真题需保留来源链接和年份地区", "来源不明题目改为原创变式并明确标注"], "next_step": "用搜索工具获取公开链接后，逐条判断来源可信度与授权边界。"}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+        return _safe_fail()
+
+
+def _expand_practice(base, topic, count):
+    while len(base) < count:
+        n = len(base) + 1
+        base.append((f"原创变式{n}：围绕“{topic}”，请先判断核心概念、适用条件和一个反例，再完成一道同类型小题。", "能说出概念、条件、反例，并完成迁移。", ["概念", "条件", "反例", "迁移表达"]))
+    return base[:count]
 
 
 def _math_practice(topic, difficulty, count):
-    qs=[]
     if "一次函数" in topic or "函数" in topic:
         base=[("已知 y=2x+3，求 x=1 时 y 的值。", "y=5", ["代入 x=1", "计算 2×1+3"]), ("直线 y=kx+b 经过点(0,3)，判断 b 的值。", "b=3", ["理解 b 是 y 轴截距"]), ("把 y=2x+1 改成 y=2x-3，图像发生什么变化？", "整体向下平移4个单位", ["斜率不变", "截距从1到-3"])]
     else:
         base=[(f"请用自己的话解释：{topic} 中最容易混淆的一个概念是什么？", "能说出定义、条件和反例", ["定义", "适用条件", "反例"])]
-    return base[:count]
+    return _expand_practice(base, topic, count)
 
 def _physics_practice(topic, difficulty, count):
     if "浮力" in topic:
         base=[("同一物体浸入同种液体更深，排开液体体积变大时，浮力如何变化？", "浮力变大，直到完全浸没后排开体积不再增加。", ["抓住 V排", "说明完全浸没边界"]), ("同一物体完全浸没在水和盐水中，哪种液体中浮力更大？为什么？", "盐水中更大，因为液体密度更大。", ["比较液体密度", "V排相同"]), ("原创考试表达题：解释 F浮=ρ液gV排 中每个量的现实含义。", "ρ液是液体密度，g为重力常量，V排为排开液体体积。", ["逐量解释", "不把物体体积和排开体积混淆"])]
     else:
         base=[(f"围绕{topic}，先判断题目要求的是概念、方向、大小还是变化关系。", "能说出判断依据。", ["对象", "条件", "规律"])]
-    return base[:count]
+    return _expand_practice(base, topic, count)
 
 def feynman_generate_practice_set(args: dict, **kwargs) -> str:
     try:
@@ -450,23 +475,25 @@ def feynman_generate_practice_set(args: dict, **kwargs) -> str:
         elif "物理" in subject:
             base = _physics_practice(topic, difficulty, count)
         else:
-            base = [(f"请围绕“{topic}”用自己的话讲核心概念，并举一个例子。", "概念准确，例子贴切，能说明适用边界。", ["核心概念", "例子", "边界"])]
+            base = _expand_practice([(f"请围绕“{topic}”用自己的话讲核心概念，并举一个例子。", "概念准确，例子贴切，能说明适用边界。", ["核心概念", "例子", "边界"])], topic, count)
         items=[]
         for i,(q,a,pts) in enumerate(base,1):
             items.append({"id": i, "type": "原创变式题", "difficulty": difficulty, "question": q, "answer_key": a, "score_points": pts, "feynman_prompt": "先说你的思路，不要直接看答案；答完后解释为什么这样做。"})
         return json.dumps({"success": True, "copyright_status": "原创生成，不声称真题；如需真题需另行核验官方来源链接。", "stage": args.get("stage", ""), "subject": subject, "topic": topic, "items": items}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+        return _safe_fail()
 
 
 def feynman_save_practice_attempt(args: dict, **kwargs) -> str:
     try:
+        if args.get("user_confirmed") is not True:
+            return json.dumps({"success": False, "needs_confirmation": True, "message": "保存练习记录前需要用户明确确认。"}, ensure_ascii=False)
         learner = (args.get("learner_id") or "default").strip() or "default"
         rec = {"created_at": _now(), "learner_id": learner, "stage": args.get("stage", ""), "subject": args.get("subject", ""), "topic": args.get("topic", ""), "question_type": args.get("question_type", ""), "learner_answer": args.get("learner_answer", ""), "score_points": args.get("score_points") or [], "lost_points": args.get("lost_points") or [], "misconception": args.get("misconception", ""), "next_variant": args.get("next_variant", ""), "review_priority": args.get("review_priority", "中")}
         _append_jsonl(_practice_path(learner), rec)
         return json.dumps({"success": True, "saved": True, "topic": rec["topic"], "review_priority": rec["review_priority"], "attempt_count": len(_load_jsonl(_practice_path(learner)))}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+        return _safe_fail()
 
 _TEXTBOOK_VERSIONS = {
     "语文": ["统编版/部编版"],
@@ -491,9 +518,31 @@ _BROAD_INTENTS = {
 }
 
 
+
+
+def _extract_exact_grade(text: str) -> str:
+    patterns = [r'(一年级|二年级|三年级|四年级|五年级|六年级|七年级|八年级|九年级|初一|初二|初三|高一|高二|高三)']
+    for pat in patterns:
+        m = re.search(pat, text)
+        if m:
+            return m.group(1)
+    return ""
+
+
+def _stage_from_grade(exact: str, fallback_text: str = "") -> str:
+    if any(x in exact for x in ["一年级", "二年级", "三年级", "四年级", "五年级", "六年级"]):
+        return "小学"
+    if any(x in exact for x in ["七年级", "八年级", "九年级", "初一", "初二", "初三"]):
+        return "初中"
+    if any(x in exact for x in ["高一", "高二", "高三"]):
+        return "高中"
+    return _pick_by_words(fallback_text, _STAGE_WORDS)
+
 def _detect_broad_intent(text: str) -> str:
-    for k, words in _BROAD_INTENTS.items():
-        if any(w in text for w in words):
+    # 任务动作优先于考试时间词："出一套期中卷" 应先识别为出卷，再把期中放进 exam_type。
+    priority = ["出卷", "预习", "补弱", "期中", "期末", "高考", "中考", "同步学习"]
+    for k in priority:
+        if any(w in text for w in _BROAD_INTENTS.get(k, [])):
             return k
     return "学科学习规划"
 
@@ -520,10 +569,12 @@ def feynman_triage_broad_learning_goal(args: dict, **kwargs) -> str:
         msg = args.get("learner_message", "")
         text = " ".join(str(args.get(k, "")) for k in ["learner_message", "known_grade", "known_subject", "known_textbook", "time_available", "goal"])
         intent = _detect_broad_intent(text)
-        grade = args.get("known_grade") or _pick_by_words(text, _STAGE_WORDS)
+        exact_grade = args.get("known_grade") or _extract_exact_grade(text)
+        grade = _stage_from_grade(exact_grade, text)
         subject = args.get("known_subject") or _detect_subject(text)
         textbook = args.get("known_textbook") or ""
-        missing = _missing_context(intent, grade, subject, textbook, scope=args.get("goal", ""), time_available=args.get("time_available", ""))
+        exam_type = "期中" if "期中" in text else "期末" if "期末" in text else "高考" if "高考" in text else "中考" if "中考" in text else ""
+        missing = _missing_context(intent, exact_grade or grade, subject, textbook, scope=args.get("goal", ""), time_available=args.get("time_available", ""))
         versions = _TEXTBOOK_VERSIONS.get(subject, []) if subject != "未明确" else []
         questions=[]
         if "年级/学段" in missing: questions.append("你现在几年级？")
@@ -531,9 +582,9 @@ def feynman_triage_broad_learning_goal(args: dict, **kwargs) -> str:
         if "教材版本或课本目录/封面" in missing: questions.append("你们用什么教材版本？不清楚可以拍课本封面或目录。")
         if "考试/学习范围" in missing: questions.append("这次范围到哪几课/哪几个单元？")
         if "可用时间/每天学习时长" in missing: questions.append("离目标还有多久？每天大概能学多少分钟？")
-        return json.dumps({"success": True, "intent": intent, "grade_or_stage": grade, "subject": subject, "known_textbook": textbook, "common_textbook_versions": versions, "missing_context": missing, "ask_next": questions[:5], "temporary_strategy": "信息不足时先给通用框架，等教材版本/范围确认后再校准章节、题型和训练节奏。", "resource_lookup_needed": intent in {"预习", "期中", "期末", "同步学习", "出卷"}}, ensure_ascii=False)
+        return json.dumps({"success": True, "intent": intent, "task_type": intent, "exam_type": exam_type, "exact_grade": exact_grade, "stage": grade, "grade_or_stage": exact_grade or grade, "subject": subject, "known_textbook": textbook, "common_textbook_versions": versions, "missing_context": missing, "ask_next": questions[:5], "temporary_strategy": "信息不足时先给通用框架，等教材版本/范围确认后再校准章节、题型和训练节奏。", "resource_lookup_needed": intent in {"预习", "期中", "期末", "同步学习", "出卷"}}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+        return _safe_fail()
 
 
 def feynman_plan_curriculum_lookup(args: dict, **kwargs) -> str:
@@ -544,7 +595,7 @@ def feynman_plan_curriculum_lookup(args: dict, **kwargs) -> str:
         if region: queries.append(f"{region} 教育考试院 {grade} {subject} 样题 试卷 官方".strip())
         return json.dumps({"success": True, "preferred_sources": ["basic.smartedu.cn 国家中小学智慧教育平台", "smartedu.cn 国家智慧教育公共服务平台", "moe.gov.cn 教育部", "neea.edu.cn 国家教育考试院", "地方教育考试院/教研部门官网"], "queries": queries, "ask_user_if_needed": ["课本封面", "目录页", "老师划定的考试范围", "所在省市/考试类型"], "safe_usage": ["保存链接、标题、章节、适用学段和学习建议", "不批量复制教材/题库全文", "有官方真题链接才标注真题", "不确定来源时生成原创模拟题"]}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+        return _safe_fail()
 
 
 def feynman_generate_subject_study_plan(args: dict, **kwargs) -> str:
@@ -555,6 +606,8 @@ def feynman_generate_subject_study_plan(args: dict, **kwargs) -> str:
         if not grade: missing.append("年级")
         if goal in {"预习","期中","期末","同步学习"} and not version: missing.append("教材版本")
         if scope == "待确认范围" and goal in {"期中","期末","预习"}: missing.append("章节/考试范围")
+        if missing and goal in {"期中", "期末", "中考", "高考", "预习", "同步学习"}:
+            return json.dumps({"success": False, "needs_clarification": True, "missing_context": missing, "ask_next": ["请补充" + "、".join(missing) + "，我再生成正式计划。"], "temporary_strategy": "可先给通用学习框架，但不生成正式每日计划，避免对错教材或错范围。"}, ensure_ascii=False)
         phases=[]
         if goal == "预习": phases=["看目录建立章节地图", "每课先问3个预习问题", "学核心概念和例题", "做基础变式", "费曼回讲本课", "小测与错因卡"]
         elif goal in {"期中","期末","中考","高考"}: phases=["范围盘点", "10分钟诊断", "高频考点与易错点排序", "分层训练", "限时模拟", "错因复盘", "二次回讲"]
@@ -566,7 +619,7 @@ def feynman_generate_subject_study_plan(args: dict, **kwargs) -> str:
             daily.append({"day": i, "minutes": mins, "focus": focus, "student_action": "先讲思路/先做1题，再看提示", "feynman_check": "用自己的话讲清今天最关键的一点", "output": "1张错因卡或1个可复述结论"})
         return json.dumps({"success": True, "grade": grade, "subject": subject, "textbook_version": version, "scope": scope, "goal_type": goal, "current_level": level, "missing_context": missing, "plan_rules": ["先诊断再讲解", "每日任务少而准", "每次练习必须回到费曼复述", "教材版本确认后校准章节顺序"], "daily_plan": daily}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+        return _safe_fail()
 
 
 def feynman_generate_exam_paper_blueprint(args: dict, **kwargs) -> str:
@@ -576,6 +629,8 @@ def feynman_generate_exam_paper_blueprint(args: dict, **kwargs) -> str:
         if not grade: missing.append("年级")
         if not scope: missing.append("考试范围/章节")
         if not args.get("textbook_version") and exam_type in {"期中", "期末", "单元测试", "原创模拟卷"}: missing.append("教材版本")
+        if missing:
+            return json.dumps({"success": False, "needs_clarification": True, "missing_context": missing, "ask_next": ["请先补充" + "、".join(missing) + "，我再生成正式试卷蓝图。"], "generation_rules": ["不在范围不明时生成正式卷", "题目原创生成", "不得伪称官方真题"]}, ensure_ascii=False)
         if "数学" in subject:
             sections=[("选择题",10,30,"基础概念、计算、图像判断"),("填空题",6,24,"关键结论与易错点"),("解答题",4,46,"过程表达、综合应用、压轴变式")]
         elif "语文" in subject:
@@ -586,4 +641,28 @@ def feynman_generate_exam_paper_blueprint(args: dict, **kwargs) -> str:
         out=[{"section":a,"count":b,"score":round(c*scale),"purpose":d,"copyright_status":"原创命题结构，不冒充真题"} for a,b,c,d in sections]
         return json.dumps({"success": True, "paper_type": exam_type, "grade": grade, "subject": subject, "scope": scope, "duration_minutes": duration, "total_score": total, "missing_context": missing, "blueprint": out, "generation_rules": ["先确认范围再出完整卷", "题目原创生成", "附答案、解析、评分点", "可按学生错因二次改卷", "不得伪称官方真题"]}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+        return _safe_fail()
+
+
+_OFFICIAL_DOMAINS = ["basic.smartedu.cn", "smartedu.cn", "moe.gov.cn", "neea.edu.cn", "chsi.com.cn"]
+_OFFICIAL_HINTS = ["教育考试院", "招生考试院", "教育厅", "教育局", "教研室", "人民教育出版社"]
+
+def feynman_check_resource_source(args: dict, **kwargs) -> str:
+    try:
+        url = (args.get("url") or "").strip()
+        title = args.get("title") or ""
+        claimed = args.get("claimed_type") or ""
+        domain = re.sub(r"^https?://", "", url).split("/")[0].lower()
+        verified = any(domain == d or domain.endswith("." + d) for d in _OFFICIAL_DOMAINS) or any(h in url + title for h in _OFFICIAL_HINTS)
+        unsafe = any(w in url + title + claimed for w in ["盗版", "会员", "破解", "答案网", "网盘", "题库下载"])
+        if unsafe:
+            source_type = "unsafe"
+        elif verified:
+            source_type = "official_or_authoritative"
+        elif "用户" in claimed or "上传" in claimed:
+            source_type = "user_provided_unverified"
+        else:
+            source_type = "public_unverified"
+        return json.dumps({"success": True, "url": url, "domain": domain, "source_type": source_type, "verified_official": bool(verified and not unsafe), "can_label_as_official_exam": bool(verified and not unsafe), "required_label": "官方公开来源" if verified and not unsafe else "原创模拟/参考题型，不得标注官方真题", "required_metadata": ["source_url", "source_domain", "year", "region", "verified_official"]}, ensure_ascii=False)
+    except Exception:
+        return _safe_fail("source_check_failed", "来源检查失败，不能标注为官方真题。", verified_official=False)

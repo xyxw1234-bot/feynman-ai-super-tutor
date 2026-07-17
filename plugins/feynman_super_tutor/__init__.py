@@ -16,6 +16,7 @@ def register(ctx):
         ("feynman_list_visual_assets", schemas.LIST_VISUAL_ASSETS, tools.feynman_list_visual_assets),
         ("feynman_map_subject_training", schemas.SUBJECT_MAP, tools.feynman_map_subject_training),
         ("feynman_plan_resource_lookup", schemas.RESOURCE_LOOKUP, tools.feynman_plan_resource_lookup),
+        ("feynman_check_resource_source", schemas.RESOURCE_SOURCE_CHECK, tools.feynman_check_resource_source),
         ("feynman_generate_practice_set", schemas.PRACTICE_SET, tools.feynman_generate_practice_set),
         ("feynman_save_practice_attempt", schemas.SAVE_PRACTICE_ATTEMPT, tools.feynman_save_practice_attempt),
         ("feynman_triage_broad_learning_goal", schemas.BROAD_GOAL_TRIAGE, tools.feynman_triage_broad_learning_goal),

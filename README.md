@@ -1,6 +1,6 @@
 # 费曼AI超级学习导师
 
-当前版本：v1.3.0「超级学伴宽入口增强版」。
+当前版本：v1.3.2「10万用户发布候选增强版」。
 
 面向 Hermes / 节点引擎 / 飞书智能体的一键安装学习导师能力包。
 
@@ -34,7 +34,7 @@ hermes plugins install xyxw1234-bot/feynman-ai-super-tutor/plugins/feynman_super
 - 自动识别小初高学段、学科、知识点、题型和考试关联
 - 支持官方公开资源索引建议、原创变式题、错因卡和复习闭环
 
-## v1.1 可视化互动学习增强
+## 可视化互动学习增强
 
 新增插件工具集 `feynman_super_tutor`：
 
@@ -85,3 +85,8 @@ hermes plugins install xyxw1234-bot/feynman-ai-super-tutor/plugins/feynman_super
 ## 致谢
 
 本项目吸收并产品化改造了开源项目 [koukekoukej-glitch/feynman-tutor](https://github.com/koukekoukej-glitch/feynman-tutor) 的核心理念。原项目采用 MIT 许可证。
+
+
+## 使用边界
+
+本工具的核心卖点就是面向中国小初高学生的学科提分训练与 AI 私教陪伴：围绕教材、考试、错因、变式、复习节奏和费曼回讲，帮助学生提升理解质量、做题能力和应试表达。官方真题/样题必须保留可核验来源；无法核验时生成原创模拟题或考试风格变式。
