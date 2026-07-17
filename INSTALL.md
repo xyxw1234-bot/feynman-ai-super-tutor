@@ -66,10 +66,10 @@ hermes plugins install xyxw1234-bot/feynman-ai-super-tutor/plugins/feynman_super
 ```
 
 
-## 固定版本安装入口
+## 活链接安装入口
 
-面向大规模正式分发时，建议使用 tag 固定版本链接，避免 `main` 分支漂移。当前候选版本固定链接：
+面向正式用户分发，推荐使用 main 分支 raw 链接，这样后续能力更新后，用户重新安装/更新时会获取最新版本：
 
 ```text
-https://raw.githubusercontent.com/xyxw1234-bot/feynman-ai-super-tutor/v1.3.2/SKILL.md
+https://raw.githubusercontent.com/xyxw1234-bot/feynman-ai-super-tutor/main/SKILL.md
 ```

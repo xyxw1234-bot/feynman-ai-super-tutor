@@ -23,7 +23,7 @@ skill=(ROOT/'SKILL.md').read_text(encoding='utf-8')
 plugin=(ROOT/'plugins/feynman_super_tutor/plugin.yaml').read_text(encoding='utf-8')
 
 # 1. Public surface checks
-for needle in ['version: 1.3.2','超级学伴宽入口协议','学科训练与考试学习增强协议','轻问诊、分学段体验与学生端专业表达协议','空白图片与假交付事故防线','视觉互动增强协议']:
+for needle in ['version: 1.3.2','超级学伴宽入口协议','学科训练与提分增强协议','轻问诊与高效提分体验协议','空白图片与假交付事故防线','视觉互动增强协议']:
     check(needle in skill, f'SKILL missing {needle}')
 for bad in ['保证'+'提分','盗版'+'教材库','YOUR'+'_TOKEN','api'+'_key=','TO'+'DO']:
     check(bad not in skill, f'bad term in SKILL: {bad}')
