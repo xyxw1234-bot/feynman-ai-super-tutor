@@ -8,7 +8,7 @@ REQUIRED = [
     "plugins/feynman_super_tutor/plugin.yaml", "plugins/feynman_super_tutor/__init__.py",
     "plugins/feynman_super_tutor/schemas.py", "plugins/feynman_super_tutor/tools.py",
     "references/visual-interactive-learning.md", "templates/h5-brief.md",
-    "references/subject-training-and-resource-policy.md", "references/visual-asset-delivery-qa.md", "references/broad-learning-companion-protocol.md", "references/china-k12-official-curriculum-source-map.md", "templates/practice-set.md", "templates/study-plan.md", "templates/exam-paper-blueprint.md",
+    "references/subject-training-and-resource-policy.md", "references/visual-asset-delivery-qa.md", "references/broad-learning-companion-protocol.md", "references/china-k12-official-curriculum-source-map.md", "templates/practice-set.md", "templates/study-plan.md", "templates/exam-paper-blueprint.md", "templates/learning-report.md",
 ]
 BAD = ["~/" + ".claude/skills", "保证" + "提分", "盗版" + "教材库", "伪" + "按钮", "TO" + "DO", "YOUR" + "_TOKEN", "api" + "_key="]
 
@@ -56,7 +56,7 @@ plugin_yaml = (ROOT / "plugins/feynman_super_tutor/plugin.yaml").read_text(encod
 if 'version: "1.3.4"' not in plugin_yaml:
     fail("plugin version not v1.3.4")
 for tool_name in ["feynman_map_subject_training", "feynman_plan_resource_lookup", "feynman_check_resource_source",
-    "feynman_align_curriculum_topic", "feynman_generate_practice_set", "feynman_save_practice_attempt", "feynman_triage_broad_learning_goal", "feynman_plan_curriculum_lookup", "feynman_generate_subject_study_plan", "feynman_generate_exam_paper_blueprint"]:
+    "feynman_align_curriculum_topic", "feynman_generate_learning_report", "feynman_generate_practice_set", "feynman_save_practice_attempt", "feynman_triage_broad_learning_goal", "feynman_plan_curriculum_lookup", "feynman_generate_subject_study_plan", "feynman_generate_exam_paper_blueprint"]:
     if tool_name not in plugin_yaml:
         fail(f"plugin.yaml missing {tool_name}")
 
@@ -82,7 +82,7 @@ required_schema_names = [
     "VISUAL_NEED_ASSESS", "INTERACTIVE_H5_BRIEF", "CREATE_INTERACTIVE_H5",
     "VISUAL_ASSET_CHECK", "LIST_VISUAL_ASSETS",
     "SUBJECT_MAP", "RESOURCE_LOOKUP", "PRACTICE_SET", "SAVE_PRACTICE_ATTEMPT",
-    "BROAD_GOAL_TRIAGE", "STUDY_PLAN", "PAPER_BLUEPRINT", "CURRICULUM_LOOKUP_PLAN", "RESOURCE_SOURCE_CHECK", "CURRICULUM_TOPIC_ALIGN",
+    "BROAD_GOAL_TRIAGE", "STUDY_PLAN", "PAPER_BLUEPRINT", "CURRICULUM_LOOKUP_PLAN", "RESOURCE_SOURCE_CHECK", "CURRICULUM_TOPIC_ALIGN", "LEARNING_REPORT",
 ]
 for name in required_schema_names:
     if not hasattr(schemas, name):

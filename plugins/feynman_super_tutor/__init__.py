@@ -24,6 +24,7 @@ def register(ctx):
         ("feynman_plan_curriculum_lookup", schemas.CURRICULUM_LOOKUP_PLAN, tools.feynman_plan_curriculum_lookup),
         ("feynman_generate_subject_study_plan", schemas.STUDY_PLAN, tools.feynman_generate_subject_study_plan),
         ("feynman_generate_exam_paper_blueprint", schemas.PAPER_BLUEPRINT, tools.feynman_generate_exam_paper_blueprint),
+        ("feynman_generate_learning_report", schemas.LEARNING_REPORT, tools.feynman_generate_learning_report),
     ]
     for name, schema, handler in registrations:
         ctx.register_tool(name=name, toolset="feynman_super_tutor", schema=schema, handler=handler)

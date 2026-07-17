@@ -756,3 +756,74 @@ def feynman_align_curriculum_topic(args: dict, **kwargs) -> str:
         }, ensure_ascii=False)
     except Exception:
         return _safe_fail("curriculum_alignment_failed", "课程定位失败，请先补充年级、学科、教材版本或章节信息。")
+
+
+def feynman_generate_learning_report(args: dict, **kwargs) -> str:
+    try:
+        if args.get("use_saved_records_confirmed") is not True:
+            return json.dumps({"success": False, "needs_confirmation": True, "message": "生成学习报告前，需要确认可以使用已保存的学习记录。若不确认，只能基于当前对话生成临时观察。"}, ensure_ascii=False)
+        learner = (args.get("learner_id") or "default").strip() or "default"
+        audience = args.get("audience") or "学生"
+        subject = (args.get("subject") or "").strip()
+        topic = (args.get("topic") or "").strip()
+        cards = _load_cards(learner)
+        attempts = _load_jsonl(_practice_path(learner)) if args.get("include_practice", True) else []
+        if subject:
+            cards = [c for c in cards if subject in c.get("subject", "")]
+            attempts = [a for a in attempts if subject in a.get("subject", "")]
+        if topic:
+            cards = [c for c in cards if topic in c.get("topic", "")]
+            attempts = [a for a in attempts if topic in a.get("topic", "")]
+        recent_cards = cards[-20:]
+        recent_attempts = attempts[-20:]
+        mastered=[]; misconceptions=[]; boundaries=[]; next_questions=[]; lost_points=[]
+        for c in recent_cards:
+            mastered += c.get("mastered") or []
+            misconceptions += c.get("misconceptions") or []
+            if c.get("current_boundary"): boundaries.append(c.get("current_boundary"))
+            next_questions += c.get("next_questions") or []
+        for a in recent_attempts:
+            lost_points += a.get("lost_points") or []
+            if a.get("misconception"): misconceptions.append(a.get("misconception"))
+        evidence_count = len(recent_cards) + len(recent_attempts)
+        if evidence_count == 0:
+            return json.dumps({"success": False, "insufficient_records": True, "message": "当前范围内没有已确认保存的学习记录。可以基于本次对话生成临时观察报告，或先完成一次学习/练习后再生成正式报告。"}, ensure_ascii=False)
+        ability_profile = {
+            "理解": "有可观察进步" if mastered else "需要更多回讲证据",
+            "表达": "能通过费曼回讲继续提升" if boundaries or next_questions else "记录不足",
+            "做题": "已有练习错因证据" if recent_attempts else "缺少练习记录",
+            "迁移": "建议用变式题继续验证" if misconceptions or lost_points else "暂无明显迁移弱点记录",
+            "考试表达": "建议补充评分点和规范步骤训练" if recent_attempts else "待通过练习评估",
+        }
+        priority=[]
+        for item in (misconceptions + lost_points + boundaries + next_questions):
+            if item and item not in priority:
+                priority.append(item)
+            if len(priority) >= 5: break
+        if audience == "学生":
+            tone = "简短、鼓励、可执行"
+            summary = f"这段学习最重要的收获是：{mastered[0] if mastered else '已经留下了可继续训练的学习证据'}。下一步先抓一个关键点：{priority[0] if priority else '做1道变式并讲清为什么'}。"
+        elif audience == "家长":
+            tone = "事实清楚、少焦虑、给陪伴建议"
+            summary = "报告基于已确认保存的学习卡和练习记录，重点看理解质量、错因类型和下一步训练，不以一次表现给孩子贴标签。"
+        else:
+            tone = "教学诊断、证据化、可跟进"
+            summary = "报告聚焦学习证据、错因归类、能力画像和下一步教学干预点。"
+        report = {
+            "title": f"费曼学习阶段报告｜{subject or '综合学习'}{('｜'+topic) if topic else ''}",
+            "audience": audience,
+            "tone": tone,
+            "period": args.get("period") or "最近已保存记录",
+            "evidence": {"learning_cards": len(recent_cards), "practice_attempts": len(recent_attempts)},
+            "summary": summary,
+            "mastered_highlights": mastered[:6],
+            "main_misconceptions": misconceptions[:8],
+            "current_boundaries": boundaries[:5],
+            "lost_points": lost_points[:6],
+            "ability_profile": ability_profile,
+            "next_training_plan": priority[:3] or ["完成1道基础题并讲清第一步", "做1道变式题", "把错因写成一句话"],
+            "report_rules": ["基于已确认保存的记录", "区分事实、判断和建议", "不做羞辱性标签", "不承诺固定分数提升"]
+        }
+        return json.dumps({"success": True, "report": report}, ensure_ascii=False)
+    except Exception:
+        return _safe_fail("learning_report_failed", "学习报告生成失败，请稍后重试或缩小报告范围。")
