@@ -1,6 +1,6 @@
 name: feynman_super_tutor
-version: "1.1.0"
-description: Local learning vault, visual-need assessment, and interactive H5 asset tools for the Feynman AI Super Tutor Skill.
+version: "1.2.0"
+description: Local learning vault, China K12 subject-training, legal resource planning, original practice generation, visual-need assessment, and interactive H5 asset tools for the Feynman AI Super Tutor Skill.
 provides_tools:
   - feynman_save_learning_card
   - feynman_read_learning_profile
@@ -11,3 +11,7 @@ provides_tools:
   - feynman_create_interactive_h5
   - feynman_check_visual_asset
   - feynman_list_visual_assets
+  - feynman_map_subject_training
+  - feynman_plan_resource_lookup
+  - feynman_generate_practice_set
+  - feynman_save_practice_attempt

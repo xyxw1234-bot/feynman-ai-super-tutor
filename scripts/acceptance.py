@@ -48,6 +48,13 @@ combined_install = (ROOT / "README.md").read_text(encoding="utf-8") + (ROOT / "I
 if "hermes plugins install xyxw1234-bot/feynman-ai-super-tutor/plugins/feynman_super_tutor --force --enable" not in combined_install:
     fail("plugin install command missing")
 
+plugin_yaml = (ROOT / "plugins/feynman_super_tutor/plugin.yaml").read_text(encoding="utf-8")
+if 'version: "1.2.0"' not in plugin_yaml:
+    fail("plugin version not v1.2.0")
+for tool_name in ["feynman_map_subject_training", "feynman_plan_resource_lookup", "feynman_generate_practice_set", "feynman_save_practice_attempt"]:
+    if tool_name not in plugin_yaml:
+        fail(f"plugin.yaml missing {tool_name}")
+
 scan_files = []
 for p in ROOT.rglob("*"):
     if not p.is_file() or p.suffix not in {".md", ".py", ".yaml", ".yml", ".txt"}:
