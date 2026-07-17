@@ -23,16 +23,16 @@ skill=(ROOT/'SKILL.md').read_text(encoding='utf-8')
 plugin=(ROOT/'plugins/feynman_super_tutor/plugin.yaml').read_text(encoding='utf-8')
 
 # 1. Public surface checks
-for needle in ['version: 1.3.2','超级学伴宽入口协议','学科训练与提分增强协议','轻问诊与高效提分体验协议','空白图片与假交付事故防线','视觉互动增强协议']:
+for needle in ['version: 1.3.3','超级学伴宽入口协议','学科训练与提分增强协议','轻问诊与高效提分体验协议','空白图片与假交付事故防线','视觉互动增强协议']:
     check(needle in skill, f'SKILL missing {needle}')
 for bad in ['保证'+'提分','盗版'+'教材库','YOUR'+'_TOKEN','api'+'_key=','TO'+'DO']:
     check(bad not in skill, f'bad term in SKILL: {bad}')
-check('version: "1.3.2"' in plugin, 'plugin manifest not v1.3.2')
-for tool_name in ['feynman_triage_broad_learning_goal','feynman_plan_curriculum_lookup','feynman_generate_subject_study_plan','feynman_generate_exam_paper_blueprint','feynman_check_resource_source','feynman_check_visual_asset']:
+check('version: "1.3.3"' in plugin, 'plugin manifest not v1.3.3')
+for tool_name in ['feynman_triage_broad_learning_goal','feynman_plan_curriculum_lookup','feynman_generate_subject_study_plan','feynman_generate_exam_paper_blueprint','feynman_check_resource_source','feynman_align_curriculum_topic','feynman_check_visual_asset']:
     check(tool_name in skill and tool_name in plugin, f'tool not public-listed: {tool_name}')
 
 # 2. Schema registration shape
-for name in ['BROAD_GOAL_TRIAGE','CURRICULUM_LOOKUP_PLAN','STUDY_PLAN','PAPER_BLUEPRINT','RESOURCE_SOURCE_CHECK','VISUAL_ASSET_CHECK']:
+for name in ['BROAD_GOAL_TRIAGE','CURRICULUM_LOOKUP_PLAN','STUDY_PLAN','PAPER_BLUEPRINT','RESOURCE_SOURCE_CHECK','CURRICULUM_TOPIC_ALIGN','VISUAL_ASSET_CHECK']:
     check(hasattr(schemas, name), f'schema missing {name}')
 
 # 3. Tool scenarios
@@ -86,6 +86,14 @@ check(src_bad.get('can_label_as_official_exam') is False, 'unverified source all
 # 长材料版权闸门
 long_bad=call('material_rights_guard', tools.feynman_ingest_material, {'title':'整本教辅全部题目','source_type':'不明','text':'版权不明材料。'*2000}, expect_success=False)
 check(long_bad.get('needs_rights_confirmation') or long_bad.get('error_code') in {'rights_confirmation_required','copyright_boundary'}, 'long copyrighted material not blocked')
+
+
+# 具体教材/章节/知识点定位
+align=call('curriculum_topic_alignment', tools.feynman_align_curriculum_topic, {'grade':'四年级','subject':'数学','textbook_version':'人教版','book':'上册','chapter':'混合运算','topic':'加减乘除混合运算'})
+card=align.get('curriculum_card',{})
+check('数与代数' in card.get('standard_domain',''), 'mixed-operation alignment should map to 数与代数')
+check(any('运算顺序' in x for x in card.get('exam_points',[])), 'mixed-operation alignment missing exam points')
+check('https://basic.smartedu.cn/syncClassroom/auto' in align.get('official_lookup_plan',{}).get('smartedu_course_channel',''), 'alignment missing SmartEdu course channel')
 
 # 学习计划
 s5=call('study_plan_preview', tools.feynman_generate_subject_study_plan, {'grade':'初二','subject':'数学','textbook_version':'人教版','scope':'前两章','goal_type':'预习','days':7,'daily_minutes':35})

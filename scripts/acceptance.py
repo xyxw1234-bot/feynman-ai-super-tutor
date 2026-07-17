@@ -8,7 +8,7 @@ REQUIRED = [
     "plugins/feynman_super_tutor/plugin.yaml", "plugins/feynman_super_tutor/__init__.py",
     "plugins/feynman_super_tutor/schemas.py", "plugins/feynman_super_tutor/tools.py",
     "references/visual-interactive-learning.md", "templates/h5-brief.md",
-    "references/subject-training-and-resource-policy.md", "references/visual-asset-delivery-qa.md", "references/broad-learning-companion-protocol.md", "templates/practice-set.md", "templates/study-plan.md", "templates/exam-paper-blueprint.md",
+    "references/subject-training-and-resource-policy.md", "references/visual-asset-delivery-qa.md", "references/broad-learning-companion-protocol.md", "references/china-k12-official-curriculum-source-map.md", "templates/practice-set.md", "templates/study-plan.md", "templates/exam-paper-blueprint.md",
 ]
 BAD = ["~/" + ".claude/skills", "保证" + "提分", "盗版" + "教材库", "伪" + "按钮", "TO" + "DO", "YOUR" + "_TOKEN", "api" + "_key="]
 
@@ -28,7 +28,7 @@ if len(skill) > 100000:
     fail("SKILL.md too large")
 for needle in [
     "name: feynman-ai-super-tutor",
-    "version: 1.3.2",
+    "version: 1.3.3",
     "## 零、自动安装与启用协议",
     "视觉互动增强协议",
     "学科训练与提分增强协议",
@@ -53,9 +53,10 @@ if "hermes plugins install xyxw1234-bot/feynman-ai-super-tutor/plugins/feynman_s
     fail("plugin install command missing")
 
 plugin_yaml = (ROOT / "plugins/feynman_super_tutor/plugin.yaml").read_text(encoding="utf-8")
-if 'version: "1.3.2"' not in plugin_yaml:
-    fail("plugin version not v1.3.2")
-for tool_name in ["feynman_map_subject_training", "feynman_plan_resource_lookup", "feynman_check_resource_source", "feynman_generate_practice_set", "feynman_save_practice_attempt", "feynman_triage_broad_learning_goal", "feynman_plan_curriculum_lookup", "feynman_generate_subject_study_plan", "feynman_generate_exam_paper_blueprint"]:
+if 'version: "1.3.3"' not in plugin_yaml:
+    fail("plugin version not v1.3.3")
+for tool_name in ["feynman_map_subject_training", "feynman_plan_resource_lookup", "feynman_check_resource_source",
+    "feynman_align_curriculum_topic", "feynman_generate_practice_set", "feynman_save_practice_attempt", "feynman_triage_broad_learning_goal", "feynman_plan_curriculum_lookup", "feynman_generate_subject_study_plan", "feynman_generate_exam_paper_blueprint"]:
     if tool_name not in plugin_yaml:
         fail(f"plugin.yaml missing {tool_name}")
 
@@ -81,7 +82,7 @@ required_schema_names = [
     "VISUAL_NEED_ASSESS", "INTERACTIVE_H5_BRIEF", "CREATE_INTERACTIVE_H5",
     "VISUAL_ASSET_CHECK", "LIST_VISUAL_ASSETS",
     "SUBJECT_MAP", "RESOURCE_LOOKUP", "PRACTICE_SET", "SAVE_PRACTICE_ATTEMPT",
-    "BROAD_GOAL_TRIAGE", "STUDY_PLAN", "PAPER_BLUEPRINT", "CURRICULUM_LOOKUP_PLAN", "RESOURCE_SOURCE_CHECK",
+    "BROAD_GOAL_TRIAGE", "STUDY_PLAN", "PAPER_BLUEPRINT", "CURRICULUM_LOOKUP_PLAN", "RESOURCE_SOURCE_CHECK", "CURRICULUM_TOPIC_ALIGN",
 ]
 for name in required_schema_names:
     if not hasattr(schemas, name):
@@ -110,6 +111,10 @@ with tempfile.TemporaryDirectory() as td:
     src2 = json.loads(tools.feynman_check_resource_source({"url": "https://example.com/some-paper", "title": "中考真题转载"}))
     if src2.get("can_label_as_official_exam"):
         fail("unverified source should not be official")
+
+    align = json.loads(tools.feynman_align_curriculum_topic({"grade": "四年级", "subject": "数学", "textbook_version": "人教版", "book": "上册", "chapter": "混合运算", "topic": "加减乘除混合运算"}))
+    if not align.get("success") or "数与代数" not in align.get("curriculum_card", {}).get("standard_domain", "") or "运算顺序" not in "\n".join(align.get("curriculum_card", {}).get("exam_points", [])):
+        fail(f"curriculum topic alignment failed: {align}")
     assess = json.loads(tools.feynman_assess_visual_need({"subject": "物理", "topic": "浮力", "learner_message": "我不懂浮力和排开体积的关系", "observed_gap": "变量关系不清", "last_attempts": ["浮力就是往上"]}))
     if assess.get("recommended_asset") not in {"interactive_h5", "step_diagram_or_h5", "diagram"}:
         fail("visual assessment failed")

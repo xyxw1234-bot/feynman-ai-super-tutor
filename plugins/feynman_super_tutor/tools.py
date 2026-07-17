@@ -666,3 +666,93 @@ def feynman_check_resource_source(args: dict, **kwargs) -> str:
         return json.dumps({"success": True, "url": url, "domain": domain, "source_type": source_type, "verified_official": bool(verified and not unsafe), "can_label_as_official_exam": bool(verified and not unsafe), "required_label": "官方公开来源" if verified and not unsafe else "原创模拟/参考题型，不得标注官方真题", "required_metadata": ["source_url", "source_domain", "year", "region", "verified_official"]}, ensure_ascii=False)
     except Exception:
         return _safe_fail("source_check_failed", "来源检查失败，不能标注为官方真题。", verified_official=False)
+
+
+_CURRICULUM_TOPIC_HINTS = [
+    {
+        "match": ["混合运算", "四则混合", "加减乘除"],
+        "subject": "数学",
+        "domain": "数与代数 / 数与运算",
+        "learning_goals": ["理解四则运算意义和运算顺序", "会根据括号和运算级别确定先算什么", "能用估算或逆运算检查结果", "能把实际问题中的数量关系转成算式"],
+        "exam_points": ["无括号与有括号混合运算顺序", "脱式计算过程规范", "应用题数量关系", "估算与检验", "易错符号和括号"],
+        "misconceptions": ["从左到右机械计算，忽略先乘除后加减", "漏看括号", "把应用题中的数量关系列反", "只追求答案不写规范过程"],
+        "feynman_prompts": ["你先说：这道题第一步为什么先算这里？", "如果把括号去掉，结果会不会变？为什么？", "你能用生活例子解释这个算式每一步在算什么吗？"],
+    },
+    {
+        "match": ["一次函数", "函数图像", "斜率", "截距"],
+        "subject": "数学",
+        "domain": "数与代数 / 函数",
+        "learning_goals": ["理解变量之间的对应关系", "理解一次函数表达式、图像和实际情境之间的联系", "会用斜率和截距解释图像变化"],
+        "exam_points": ["函数表达式求值", "图像识别", "待定系数法", "实际应用题", "k、b 对图像的影响"],
+        "misconceptions": ["把 k 和 b 的作用混淆", "只会代入不会解释图像", "不会从图像读出实际意义"],
+        "feynman_prompts": ["你用自己的话说 k 变大时图像发生什么变化。", "b 为什么是和 y 轴的交点？", "这个图像放到实际问题里，每个点代表什么？"],
+    },
+    {
+        "match": ["浮力", "阿基米德", "排开液体"],
+        "subject": "物理",
+        "domain": "物质、运动和相互作用 / 力学",
+        "learning_goals": ["理解浮力方向和产生原因", "理解 F浮 与液体密度、排开液体体积的关系", "区分浸入过程和完全浸没后的变量变化"],
+        "exam_points": ["浮力大小判断", "称重法", "阿基米德原理", "液体密度比较", "实验探究变量控制"],
+        "misconceptions": ["认为越深浮力一定越大", "混淆物体体积和排开液体体积", "忽略完全浸没后的边界"],
+        "feynman_prompts": ["你先讲：浮力到底和哪两个量直接有关？", "完全浸没后继续变深，V排还变吗？", "盐水和清水里，哪个量变了？"],
+    },
+]
+
+def _topic_hint(subject: str, topic: str):
+    text = subject + " " + topic
+    for h in _CURRICULUM_TOPIC_HINTS:
+        if (not h.get("subject") or h["subject"] in subject or subject in h["subject"]) and any(k in text for k in h["match"]):
+            return h
+    if "数学" in subject:
+        return {"domain": "数与代数 / 图形与几何 / 统计与概率 / 综合与实践（需按教材目录校准）", "learning_goals": ["先确认概念、规则、适用条件和典型题型"], "exam_points": ["基础概念", "运算/推理过程", "应用表达", "变式迁移"], "misconceptions": ["只会套步骤，不会解释为什么"], "feynman_prompts": ["你先用自己的话讲这个知识点在解决什么问题。"]}
+    if "语文" in subject:
+        return {"domain": "识字与写字 / 阅读与鉴赏 / 表达与交流 / 梳理与探究（需按教材目录校准）", "learning_goals": ["理解文本内容、表达方法和语言运用"], "exam_points": ["字词句", "阅读理解", "表达运用", "作文迁移"], "misconceptions": ["只背答案，不会从文本找依据"], "feynman_prompts": ["你先说：这段文字主要写了什么，依据是哪一句？"]}
+    return {"domain": "需结合教材目录和课程标准校准", "learning_goals": ["先确认概念、方法、情境和评价要求"], "exam_points": ["核心概念", "典型题型", "表达规范"], "misconceptions": ["概念会背但不会迁移"], "feynman_prompts": ["你先用自己的话讲这个知识点的关键关系。"]}
+
+def feynman_align_curriculum_topic(args: dict, **kwargs) -> str:
+    try:
+        grade = args.get("grade", "")
+        subject = args.get("subject", "")
+        version = args.get("textbook_version", "")
+        book = args.get("book", "")
+        chapter = args.get("chapter", "")
+        topic = args.get("topic", "")
+        hint = _topic_hint(subject, topic + " " + chapter)
+        missing = []
+        if not grade: missing.append("年级")
+        if not version: missing.append("教材版本")
+        if not chapter: missing.append("章节/单元")
+        lookup_queries = [
+            f"国家中小学智慧教育平台 {grade} {subject} {version} {book} {chapter} {topic}".strip(),
+            f"教育部 课程标准 {subject} {topic} {grade}".strip(),
+            f"{grade} {subject} {version} {topic} 教材 目录 官方".strip(),
+        ]
+        return json.dumps({
+            "success": True,
+            "alignment_confidence": "provisional" if missing else "ready_for_official_lookup",
+            "missing_context": missing,
+            "curriculum_card": {
+                "grade": grade,
+                "subject": subject,
+                "textbook_version": version,
+                "book": book,
+                "chapter": chapter,
+                "topic": topic,
+                "standard_domain": hint["domain"],
+                "learning_goals": hint["learning_goals"],
+                "exam_points": hint["exam_points"],
+                "common_misconceptions": hint["misconceptions"],
+                "feynman_prompts": hint["feynman_prompts"],
+            },
+            "official_lookup_plan": {
+                "smartedu_course_channel": "https://basic.smartedu.cn/syncClassroom/auto",
+                "smartedu_textbook_channel": "https://basic.smartedu.cn/elecEdu",
+                "moe_compulsory_standards": "http://www.moe.gov.cn/srcsite/A26/s8001/202204/t20220420_619921.html",
+                "moe_high_school_standards": "http://www.moe.gov.cn/srcsite/A26/s8001/202006/t20200603_462199.html",
+                "queries": lookup_queries,
+            },
+            "recommended_learning_flow": ["先问学生讲规则/第一步", "用1道基础题暴露错因", "最小补强", "变式题", "考试表达/评分点", "回讲总结"],
+            "truthfulness_rule": "未完成官方来源核验前，不把题目标注为官方真题；可生成原创变式。"
+        }, ensure_ascii=False)
+    except Exception:
+        return _safe_fail("curriculum_alignment_failed", "课程定位失败，请先补充年级、学科、教材版本或章节信息。")
