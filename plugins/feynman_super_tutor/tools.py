@@ -467,3 +467,123 @@ def feynman_save_practice_attempt(args: dict, **kwargs) -> str:
         return json.dumps({"success": True, "saved": True, "topic": rec["topic"], "review_priority": rec["review_priority"], "attempt_count": len(_load_jsonl(_practice_path(learner)))}, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+
+_TEXTBOOK_VERSIONS = {
+    "语文": ["统编版/部编版"],
+    "道德与法治/政治": ["统编版/部编版"],
+    "历史": ["统编版/部编版"],
+    "数学": ["人教版", "北师大版", "苏教版", "沪教版", "湘教版", "冀教版", "华东师大版"],
+    "英语": ["人教版", "外研版", "译林版", "北师大版", "沪教版"],
+    "物理": ["人教版", "沪科版", "苏科版", "北师大版", "教科版"],
+    "化学": ["人教版", "鲁教版", "沪教版", "科粤版"],
+    "生物": ["人教版", "苏教版", "北师大版", "冀少版"],
+    "地理": ["人教版", "湘教版", "中图版", "商务星球版"],
+}
+_BROAD_INTENTS = {
+    "预习": ["预习", "新学期", "下学期", "马上要上", "前几课", "提前学"],
+    "期中": ["期中", "半期"],
+    "期末": ["期末", "学期末"],
+    "中考": ["中考", "初三冲刺"],
+    "高考": ["高考", "新高考", "一轮", "二轮"],
+    "补弱": ["补弱", "提高成绩", "提分", "薄弱", "跟不上", "基础差"],
+    "出卷": ["出卷", "卷子", "试卷", "模拟卷", "考试卷", "练习卷"],
+    "同步学习": ["同步", "教材", "课本", "这一课", "目录"],
+}
+
+
+def _detect_broad_intent(text: str) -> str:
+    for k, words in _BROAD_INTENTS.items():
+        if any(w in text for w in words):
+            return k
+    return "学科学习规划"
+
+
+def _detect_subject(text: str) -> str:
+    return _pick_by_words(text, _SUBJECT_WORDS)
+
+
+def _missing_context(intent, grade, subject, textbook, scope='', time_available=''):
+    missing=[]
+    if not grade or grade == "未明确": missing.append("年级/学段")
+    if not subject or subject == "未明确": missing.append("学科")
+    if intent in {"预习", "期中", "期末", "同步学习", "出卷"} and not textbook:
+        missing.append("教材版本或课本目录/封面")
+    if intent in {"期中", "期末", "出卷", "复习"} and not scope:
+        missing.append("考试/学习范围")
+    if intent not in {"出卷"} and not time_available:
+        missing.append("可用时间/每天学习时长")
+    return missing
+
+
+def feynman_triage_broad_learning_goal(args: dict, **kwargs) -> str:
+    try:
+        msg = args.get("learner_message", "")
+        text = " ".join(str(args.get(k, "")) for k in ["learner_message", "known_grade", "known_subject", "known_textbook", "time_available", "goal"])
+        intent = _detect_broad_intent(text)
+        grade = args.get("known_grade") or _pick_by_words(text, _STAGE_WORDS)
+        subject = args.get("known_subject") or _detect_subject(text)
+        textbook = args.get("known_textbook") or ""
+        missing = _missing_context(intent, grade, subject, textbook, scope=args.get("goal", ""), time_available=args.get("time_available", ""))
+        versions = _TEXTBOOK_VERSIONS.get(subject, []) if subject != "未明确" else []
+        questions=[]
+        if "年级/学段" in missing: questions.append("你现在几年级？")
+        if "学科" in missing: questions.append("要规划哪一科？")
+        if "教材版本或课本目录/封面" in missing: questions.append("你们用什么教材版本？不清楚可以拍课本封面或目录。")
+        if "考试/学习范围" in missing: questions.append("这次范围到哪几课/哪几个单元？")
+        if "可用时间/每天学习时长" in missing: questions.append("离目标还有多久？每天大概能学多少分钟？")
+        return json.dumps({"success": True, "intent": intent, "grade_or_stage": grade, "subject": subject, "known_textbook": textbook, "common_textbook_versions": versions, "missing_context": missing, "ask_next": questions[:5], "temporary_strategy": "信息不足时先给通用框架，等教材版本/范围确认后再校准章节、题型和训练节奏。", "resource_lookup_needed": intent in {"预习", "期中", "期末", "同步学习", "出卷"}}, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+
+
+def feynman_plan_curriculum_lookup(args: dict, **kwargs) -> str:
+    try:
+        subject=args.get("subject", ""); grade=args.get("grade", ""); version=args.get("textbook_version", ""); book=args.get("book", ""); region=args.get("region", ""); scope=args.get("scope", "")
+        queries=[f"国家中小学智慧教育平台 {grade} {subject} {version} {book} 教材 目录".strip(), f"{grade} {subject} {version} {book} 电子教材 目录 官方".strip()]
+        if scope: queries.append(f"{grade} {subject} {version} {scope} 教学资源 官方".strip())
+        if region: queries.append(f"{region} 教育考试院 {grade} {subject} 样题 试卷 官方".strip())
+        return json.dumps({"success": True, "preferred_sources": ["basic.smartedu.cn 国家中小学智慧教育平台", "smartedu.cn 国家智慧教育公共服务平台", "moe.gov.cn 教育部", "neea.edu.cn 国家教育考试院", "地方教育考试院/教研部门官网"], "queries": queries, "ask_user_if_needed": ["课本封面", "目录页", "老师划定的考试范围", "所在省市/考试类型"], "safe_usage": ["保存链接、标题、章节、适用学段和学习建议", "不批量复制教材/题库全文", "有官方真题链接才标注真题", "不确定来源时生成原创模拟题"]}, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+
+
+def feynman_generate_subject_study_plan(args: dict, **kwargs) -> str:
+    try:
+        subject=args.get("subject", ""); goal=args.get("goal_type") or "同步学习"; days=max(1,min(60,int(args.get("days") or 7))); mins=max(10,min(240,int(args.get("daily_minutes") or 30)))
+        grade=args.get("grade") or args.get("stage", ""); version=args.get("textbook_version", ""); scope=args.get("scope") or "待确认范围"; level=args.get("current_level") or "先用诊断题判断"
+        missing=[]
+        if not grade: missing.append("年级")
+        if goal in {"预习","期中","期末","同步学习"} and not version: missing.append("教材版本")
+        if scope == "待确认范围" and goal in {"期中","期末","预习"}: missing.append("章节/考试范围")
+        phases=[]
+        if goal == "预习": phases=["看目录建立章节地图", "每课先问3个预习问题", "学核心概念和例题", "做基础变式", "费曼回讲本课", "小测与错因卡"]
+        elif goal in {"期中","期末","中考","高考"}: phases=["范围盘点", "10分钟诊断", "高频考点与易错点排序", "分层训练", "限时模拟", "错因复盘", "二次回讲"]
+        elif goal == "补弱": phases=["诊断薄弱单元", "补底层概念", "基础题重建信心", "易错题辨析", "每天一组变式", "每周复盘"]
+        else: phases=["同步预习", "课堂后回讲", "作业错因分析", "周末小测", "复习卡沉淀"]
+        daily=[]
+        for i in range(1, days+1):
+            focus=phases[(i-1)%len(phases)]
+            daily.append({"day": i, "minutes": mins, "focus": focus, "student_action": "先讲思路/先做1题，再看提示", "feynman_check": "用自己的话讲清今天最关键的一点", "output": "1张错因卡或1个可复述结论"})
+        return json.dumps({"success": True, "grade": grade, "subject": subject, "textbook_version": version, "scope": scope, "goal_type": goal, "current_level": level, "missing_context": missing, "plan_rules": ["先诊断再讲解", "每日任务少而准", "每次练习必须回到费曼复述", "教材版本确认后校准章节顺序"], "daily_plan": daily}, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+
+
+def feynman_generate_exam_paper_blueprint(args: dict, **kwargs) -> str:
+    try:
+        subject=args.get("subject", ""); grade=args.get("grade", ""); scope=args.get("scope", ""); exam_type=args.get("exam_type") or "原创模拟卷"; duration=int(args.get("duration_minutes") or 90); total=int(args.get("total_score") or 100)
+        missing=[]
+        if not grade: missing.append("年级")
+        if not scope: missing.append("考试范围/章节")
+        if not args.get("textbook_version") and exam_type in {"期中", "期末", "单元测试", "原创模拟卷"}: missing.append("教材版本")
+        if "数学" in subject:
+            sections=[("选择题",10,30,"基础概念、计算、图像判断"),("填空题",6,24,"关键结论与易错点"),("解答题",4,46,"过程表达、综合应用、压轴变式")]
+        elif "语文" in subject:
+            sections=[("积累与运用",6,20,"字词、古诗文、语言运用"),("阅读",3,40,"现代文/文言文/非连续文本"),("写作",1,40,"作文表达")]
+        else:
+            sections=[("基础题",10,40,"概念和规则"),("能力题",5,35,"图表/材料/实验/应用"),("综合题",2,25,"迁移和表达")]
+        scale=total/sum(x[2] for x in sections)
+        out=[{"section":a,"count":b,"score":round(c*scale),"purpose":d,"copyright_status":"原创命题结构，不冒充真题"} for a,b,c,d in sections]
+        return json.dumps({"success": True, "paper_type": exam_type, "grade": grade, "subject": subject, "scope": scope, "duration_minutes": duration, "total_score": total, "missing_context": missing, "blueprint": out, "generation_rules": ["先确认范围再出完整卷", "题目原创生成", "附答案、解析、评分点", "可按学生错因二次改卷", "不得伪称官方真题"]}, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)

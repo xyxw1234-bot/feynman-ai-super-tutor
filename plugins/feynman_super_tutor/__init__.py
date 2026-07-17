@@ -18,6 +18,10 @@ def register(ctx):
         ("feynman_plan_resource_lookup", schemas.RESOURCE_LOOKUP, tools.feynman_plan_resource_lookup),
         ("feynman_generate_practice_set", schemas.PRACTICE_SET, tools.feynman_generate_practice_set),
         ("feynman_save_practice_attempt", schemas.SAVE_PRACTICE_ATTEMPT, tools.feynman_save_practice_attempt),
+        ("feynman_triage_broad_learning_goal", schemas.BROAD_GOAL_TRIAGE, tools.feynman_triage_broad_learning_goal),
+        ("feynman_plan_curriculum_lookup", schemas.CURRICULUM_LOOKUP_PLAN, tools.feynman_plan_curriculum_lookup),
+        ("feynman_generate_subject_study_plan", schemas.STUDY_PLAN, tools.feynman_generate_subject_study_plan),
+        ("feynman_generate_exam_paper_blueprint", schemas.PAPER_BLUEPRINT, tools.feynman_generate_exam_paper_blueprint),
     ]
     for name, schema, handler in registrations:
         ctx.register_tool(name=name, toolset="feynman_super_tutor", schema=schema, handler=handler)

@@ -8,7 +8,7 @@ REQUIRED = [
     "plugins/feynman_super_tutor/plugin.yaml", "plugins/feynman_super_tutor/__init__.py",
     "plugins/feynman_super_tutor/schemas.py", "plugins/feynman_super_tutor/tools.py",
     "references/visual-interactive-learning.md", "templates/h5-brief.md",
-    "references/subject-training-and-resource-policy.md", "references/visual-asset-delivery-qa.md", "templates/practice-set.md",
+    "references/subject-training-and-resource-policy.md", "references/visual-asset-delivery-qa.md", "references/broad-learning-companion-protocol.md", "templates/practice-set.md", "templates/study-plan.md", "templates/exam-paper-blueprint.md",
 ]
 BAD = ["~/" + ".claude/skills", "保证" + "提分", "盗版" + "教材库", "伪" + "按钮", "TO" + "DO", "YOUR" + "_TOKEN", "api" + "_key="]
 
@@ -28,11 +28,15 @@ if len(skill) > 100000:
     fail("SKILL.md too large")
 for needle in [
     "name: feynman-ai-super-tutor",
-    "version: 1.2.0",
+    "version: 1.3.0",
     "## 零、自动安装与启用协议",
     "视觉互动增强协议",
     "学科训练与提分增强协议",
     "空白图片与假交付事故防线",
+    "超级学伴宽入口协议",
+    "feynman_triage_broad_learning_goal",
+    "feynman_generate_subject_study_plan",
+    "feynman_generate_exam_paper_blueprint",
     "feynman_map_subject_training",
     "feynman_generate_practice_set",
     "feynman_assess_visual_need",
@@ -49,9 +53,9 @@ if "hermes plugins install xyxw1234-bot/feynman-ai-super-tutor/plugins/feynman_s
     fail("plugin install command missing")
 
 plugin_yaml = (ROOT / "plugins/feynman_super_tutor/plugin.yaml").read_text(encoding="utf-8")
-if 'version: "1.2.0"' not in plugin_yaml:
-    fail("plugin version not v1.2.0")
-for tool_name in ["feynman_map_subject_training", "feynman_plan_resource_lookup", "feynman_generate_practice_set", "feynman_save_practice_attempt"]:
+if 'version: "1.3.0"' not in plugin_yaml:
+    fail("plugin version not v1.3.0")
+for tool_name in ["feynman_map_subject_training", "feynman_plan_resource_lookup", "feynman_generate_practice_set", "feynman_save_practice_attempt", "feynman_triage_broad_learning_goal", "feynman_plan_curriculum_lookup", "feynman_generate_subject_study_plan", "feynman_generate_exam_paper_blueprint"]:
     if tool_name not in plugin_yaml:
         fail(f"plugin.yaml missing {tool_name}")
 
@@ -77,6 +81,7 @@ required_schema_names = [
     "VISUAL_NEED_ASSESS", "INTERACTIVE_H5_BRIEF", "CREATE_INTERACTIVE_H5",
     "VISUAL_ASSET_CHECK", "LIST_VISUAL_ASSETS",
     "SUBJECT_MAP", "RESOURCE_LOOKUP", "PRACTICE_SET", "SAVE_PRACTICE_ATTEMPT",
+    "BROAD_GOAL_TRIAGE", "STUDY_PLAN", "PAPER_BLUEPRINT", "CURRICULUM_LOOKUP_PLAN",
 ]
 for name in required_schema_names:
     if not hasattr(schemas, name):
@@ -124,5 +129,18 @@ with tempfile.TemporaryDirectory() as td:
     attempt = json.loads(tools.feynman_save_practice_attempt({"subject": "物理", "topic": "浮力", "question_type": "实验探究题", "learner_answer": "浮力只和深度有关", "lost_points": ["混淆深度和排开体积"], "misconception": "认为越深浮力一定越大", "next_variant": "完全浸没后的变式", "review_priority": "高"}))
     if not attempt.get("saved"):
         fail("practice attempt save failed")
+
+    broad = json.loads(tools.feynman_triage_broad_learning_goal({"learner_message": "我马上期中考试了，帮我规划一下初二数学复习", "known_grade": "初二", "known_subject": "数学", "time_available": "14天"}))
+    if broad.get("intent") != "期中" or "教材版本或课本目录/封面" not in broad.get("missing_context", []):
+        fail(f"broad goal triage failed: {broad}")
+    curr = json.loads(tools.feynman_plan_curriculum_lookup({"grade": "初二", "subject": "数学", "textbook_version": "人教版", "scope": "前三章"}))
+    if not curr.get("success") or "basic.smartedu.cn 国家中小学智慧教育平台" not in curr.get("preferred_sources", []):
+        fail("curriculum lookup plan failed")
+    study = json.loads(tools.feynman_generate_subject_study_plan({"grade": "初二", "subject": "数学", "textbook_version": "人教版", "scope": "前三章", "goal_type": "期中", "days": 5, "daily_minutes": 40}))
+    if len(study.get("daily_plan", [])) != 5 or study.get("goal_type") != "期中":
+        fail("subject study plan failed")
+    paper = json.loads(tools.feynman_generate_exam_paper_blueprint({"grade": "七年级", "subject": "语文", "scope": "第一、二单元", "exam_type": "期中", "duration_minutes": 120, "total_score": 100}))
+    if not paper.get("success") or not paper.get("blueprint") or "不得伪称官方真题" not in paper.get("generation_rules", []):
+        fail("exam paper blueprint failed")
 
 print("PASS: package acceptance checks passed")
