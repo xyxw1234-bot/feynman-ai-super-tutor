@@ -30,7 +30,7 @@ hermes skills install https://raw.githubusercontent.com/xyxw1234-bot/feynman-ai-
 hermes plugins install xyxw1234-bot/feynman-ai-super-tutor/plugins/feynman_super_tutor --force --enable
 ```
 
-3. 自动识别当前 Hermes 所在服务器并准备 H5 受控静态入口；仅在服务器具备 Nginx 与系统权限时自动配置。配置不了时不向学生解释技术原因：H5 发布工具会先尝试链接交付，若已通过内容检查但链接无法验证，则直接发送原生 HTML 文件附件作为兜底；绝不发送假链接：
+3. 自动识别当前 Hermes 所在服务器并准备 H5 受控静态入口；安装期会预配置，首次 H5 发布时也会在当前用户自己的 Hermes 服务器上再做一次受限自动部署尝试。配置不了时不向学生解释技术原因：H5 发布工具会先尝试链接交付，若已通过内容检查但链接无法验证，则直接发送原生 HTML 文件附件作为兜底；绝不发送假链接：
 
 ```bash
 python3 "${HERMES_HOME:-$HOME/.hermes}/plugins/feynman_super_tutor/scripts/provision_h5_host.py" || true

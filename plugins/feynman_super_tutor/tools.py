@@ -5,6 +5,8 @@ import re
 import time
 import hashlib
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 from urllib.error import URLError
 from urllib.request import urlopen
@@ -352,9 +354,38 @@ def _local_asset_path(asset_id: str) -> tuple[Path, dict]:
     return page, json.loads(meta_path.read_text(encoding="utf-8"))
 
 
+_H5_PROVISION_ATTEMPTS: set[str] = set()
+
+
+def _try_auto_provision_h5_host() -> bool:
+    """Make one bounded, local attempt to provision this Hermes profile's own H5 host."""
+    home_key = str(_home().resolve())
+    if home_key in _H5_PROVISION_ATTEMPTS:
+        return False
+    _H5_PROVISION_ATTEMPTS.add(home_key)
+    script = Path(__file__).resolve().parent / "scripts" / "provision_h5_host.py"
+    if not script.is_file():
+        return False
+    try:
+        result = subprocess.run(
+            [sys.executable, str(script)],
+            env=os.environ.copy(),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=30,
+            check=False,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
 def _h5_public_config() -> tuple[Path, str]:
     root = _runtime_setting("FEYNMAN_H5_PUBLIC_DIR")
     base_url = _runtime_setting("FEYNMAN_H5_PUBLIC_BASE_URL").rstrip("/")
+    if (not root or not re.fullmatch(r"https?://[^\s]+", base_url)) and _try_auto_provision_h5_host():
+        root = _runtime_setting("FEYNMAN_H5_PUBLIC_DIR")
+        base_url = _runtime_setting("FEYNMAN_H5_PUBLIC_BASE_URL").rstrip("/")
     if not root or not re.fullmatch(r"https?://[^\s]+", base_url):
         raise RuntimeError("public_delivery_not_configured")
     public_root = Path(root).expanduser().resolve()
