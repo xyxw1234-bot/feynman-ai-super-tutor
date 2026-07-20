@@ -115,6 +115,8 @@ h5=call('h5_generate', tools.feynman_create_interactive_h5, {'title':'浮力互�
 check(h5.get('asset_id') and 'file_path' not in json.dumps(h5, ensure_ascii=False), 'H5 create leaked local file data')
 qa=call('h5_static_check', tools.feynman_check_visual_asset, {'asset_id':h5.get('asset_id',''),'expected_interactions':['rho','vol']})
 check(qa.get('passed') is True, f'H5 static QA failed: {qa}')
+h5_list=call('h5_list_safe_output', tools.feynman_list_visual_assets, {'topic':'浮力'})
+check('file_path' not in json.dumps(h5_list, ensure_ascii=False), 'H5 list leaked local file path')
 
 generic=call('h5_generic_generate', tools.feynman_create_interactive_h5, {'title':'通用互动','topic':'未知主题','learning_goal':'测试','interaction_type':'generic_slider'})
 generic_qa=call('h5_generic_static_check', tools.feynman_check_visual_asset, {'asset_id':generic.get('asset_id','')}, expect_success=True)

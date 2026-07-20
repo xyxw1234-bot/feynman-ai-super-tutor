@@ -78,6 +78,29 @@ def _safe_fail(code="internal_error", message="操作失败，请稍后重试或
     return json.dumps(data, ensure_ascii=False)
 
 
+def _runtime_setting(name: str) -> str:
+    """Read a current-profile runtime setting even when a service did not export .env."""
+    value = (os.environ.get(name) or "").strip()
+    if value:
+        return value
+    env_file = _home() / ".env"
+    if not env_file.is_file():
+        return ""
+    try:
+        for line in reversed(env_file.read_text(encoding="utf-8", errors="ignore").splitlines()):
+            line = line.strip()
+            if line.startswith("export "):
+                line = line[7:].lstrip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, candidate = line.split("=", 1)
+            if key.strip() == name:
+                return candidate.strip().strip('"').strip("'")
+    except OSError:
+        pass
+    return ""
+
+
 
 def feynman_save_learning_card(args: dict, **kwargs) -> str:
     try:
@@ -330,8 +353,8 @@ def _local_asset_path(asset_id: str) -> tuple[Path, dict]:
 
 
 def _h5_public_config() -> tuple[Path, str]:
-    root = (os.environ.get("FEYNMAN_H5_PUBLIC_DIR") or "").strip()
-    base_url = (os.environ.get("FEYNMAN_H5_PUBLIC_BASE_URL") or "").strip().rstrip("/")
+    root = _runtime_setting("FEYNMAN_H5_PUBLIC_DIR")
+    base_url = _runtime_setting("FEYNMAN_H5_PUBLIC_BASE_URL").rstrip("/")
     if not root or not re.fullmatch(r"https?://[^\s]+", base_url):
         raise RuntimeError("public_delivery_not_configured")
     public_root = Path(root).expanduser().resolve()
@@ -349,7 +372,7 @@ def feynman_publish_interactive_h5(args: dict, **kwargs) -> str:
     """Publish one checked H5 page and return a link only after a live 200 read-back."""
     try:
         page, meta = _local_asset_path(str(args.get("asset_id") or ""))
-        static = json.loads(feynman_check_visual_asset({"file_path": str(page)}))
+        static = json.loads(feynman_check_visual_asset({"asset_id": meta["asset_id"]}))
         if not static.get("passed") or meta.get("interaction_type") == "generic_slider":
             return _safe_fail("h5_not_ready", "这个互动页还不适合直接打开，我先继续用文字带你学。", student_deliverable_ready=False)
         public_root, base_url = _h5_public_config()
@@ -367,7 +390,7 @@ def feynman_publish_interactive_h5(args: dict, **kwargs) -> str:
             if staging_dir.exists():
                 shutil.rmtree(staging_dir, ignore_errors=True)
         public_url = f"{base_url}/{profile_key}/{public_asset_key}/"
-        verify_base = (os.environ.get("FEYNMAN_H5_VERIFY_BASE_URL") or base_url).strip().rstrip("/")
+        verify_base = (_runtime_setting("FEYNMAN_H5_VERIFY_BASE_URL") or base_url).rstrip("/")
         verify_url = f"{verify_base}/{profile_key}/{public_asset_key}/"
         try:
             with urlopen(verify_url, timeout=10) as response:
@@ -385,11 +408,7 @@ def feynman_publish_interactive_h5(args: dict, **kwargs) -> str:
 
 def feynman_check_visual_asset(args: dict, **kwargs) -> str:
     try:
-        requested_path = (args.get("file_path") or "").strip()
-        if requested_path:
-            p = Path(requested_path)
-        else:
-            p, _ = _local_asset_path(str(args.get("asset_id") or ""))
+        p, _ = _local_asset_path(str(args.get("asset_id") or ""))
         if not p.exists():
             return json.dumps({"success": False, "passed": False, "errors": ["file_not_found"]}, ensure_ascii=False)
         text = p.read_text(encoding="utf-8", errors="ignore")
@@ -435,7 +454,21 @@ def feynman_list_visual_assets(args: dict, **kwargs) -> str:
             rows = [r for r in rows if subject in r.get("subject", "")]
         if topic:
             rows = [r for r in rows if topic in r.get("topic", "")]
-        return json.dumps({"success": True, "count": len(rows), "assets": rows[-limit:]}, ensure_ascii=False)
+        safe_assets = [
+            {
+                "asset_id": row.get("asset_id", ""),
+                "title": row.get("title", ""),
+                "subject": row.get("subject", ""),
+                "grade": row.get("grade", ""),
+                "topic": row.get("topic", ""),
+                "interaction_type": row.get("interaction_type", ""),
+                "status": row.get("status", ""),
+                "public_url": row.get("public_url"),
+                "created_at": row.get("created_at", ""),
+            }
+            for row in rows[-limit:]
+        ]
+        return json.dumps({"success": True, "count": len(rows), "assets": safe_assets}, ensure_ascii=False)
     except Exception as e:
         return _safe_fail()
 
