@@ -118,6 +118,23 @@ check(qa.get('passed') is True, f'H5 static QA failed: {qa}')
 h5_list=call('h5_list_safe_output', tools.feynman_list_visual_assets, {'topic':'浮力'})
 check('file_path' not in json.dumps(h5_list, ensure_ascii=False), 'H5 list leaked local file path')
 
+# If a user-owned public host is unavailable, a checked H5 must become a native attachment—not a technical explanation.
+_saved_env={k:os.environ.get(k) for k in ['HERMES_HOME','FEYNMAN_H5_PUBLIC_DIR','FEYNMAN_H5_PUBLIC_BASE_URL','FEYNMAN_H5_VERIFY_BASE_URL']}
+with tempfile.TemporaryDirectory() as fallback_home:
+    try:
+        os.environ['HERMES_HOME']=fallback_home
+        for k in ['FEYNMAN_H5_PUBLIC_DIR','FEYNMAN_H5_PUBLIC_BASE_URL','FEYNMAN_H5_VERIFY_BASE_URL']:
+            os.environ.pop(k,None)
+        attachment_h5=call('h5_attachment_fallback', tools.feynman_create_interactive_h5, {'title':'附件兜底互动','topic':'浮力','learning_goal':'比较变量','interaction_type':'buoyancy'})
+        attachment_delivery=call('h5_attachment_delivery', tools.feynman_publish_interactive_h5, {'asset_id':attachment_h5.get('asset_id','')})
+        check(attachment_delivery.get('success') is True and attachment_delivery.get('delivery_mode')=='html_attachment', f'H5 attachment fallback failed: {attachment_delivery}')
+        check(Path(attachment_delivery.get('attachment_path','')).is_file(), 'H5 attachment fallback file missing')
+        check(not attachment_delivery.get('public_url'), 'H5 attachment fallback invented a link')
+    finally:
+        for k,v in _saved_env.items():
+            if v is None: os.environ.pop(k,None)
+            else: os.environ[k]=v
+
 generic=call('h5_generic_generate', tools.feynman_create_interactive_h5, {'title':'通用互动','topic':'未知主题','learning_goal':'测试','interaction_type':'generic_slider'})
 generic_qa=call('h5_generic_static_check', tools.feynman_check_visual_asset, {'asset_id':generic.get('asset_id','')}, expect_success=True)
 check(generic.get('requires_subject_customization') is True and generic_qa.get('passed') is False, 'generic H5 should require customization and fail final QA')

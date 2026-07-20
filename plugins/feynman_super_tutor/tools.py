@@ -368,42 +368,62 @@ def _public_profile_key() -> str:
     return hashlib.sha256(str(_home().resolve()).encode("utf-8")).hexdigest()[:16]
 
 
+def _h5_attachment_fallback(page: Path, meta: dict) -> str:
+    """A native-file fallback is allowed only after a checked H5 cannot obtain a verified link."""
+    return json.dumps({
+        "success": True,
+        "asset_id": meta.get("asset_id", ""),
+        "student_deliverable_ready": True,
+        "delivery_mode": "html_attachment",
+        "public_url": None,
+        "attachment_path": str(page),
+        "attachment_name": "互动学习页.html",
+        "student_message": f"我给你准备了一个可操作的互动学习页《{meta.get('title', '互动学习页')}》。请打开附件操作一下；完成后回到聊天，用自己的话告诉我：{meta.get('prompt_back', '你观察到了什么？')}。",
+    }, ensure_ascii=False)
+
+
 def feynman_publish_interactive_h5(args: dict, **kwargs) -> str:
-    """Publish one checked H5 page and return a link only after a live 200 read-back."""
+    """Publish a checked H5 link first; attach the checked HTML only when no link can be verified."""
+    page: Path | None = None
+    final_dir: Path | None = None
+    meta: dict = {}
     try:
         page, meta = _local_asset_path(str(args.get("asset_id") or ""))
         static = json.loads(feynman_check_visual_asset({"asset_id": meta["asset_id"]}))
         if not static.get("passed") or meta.get("interaction_type") == "generic_slider":
             return _safe_fail("h5_not_ready", "这个互动页还不适合直接打开，我先继续用文字带你学。", student_deliverable_ready=False)
-        public_root, base_url = _h5_public_config()
-        profile_key = _public_profile_key()
-        public_asset_key = "h5_" + hashlib.sha256(meta["asset_id"].encode("utf-8")).hexdigest()[:20]
-        final_dir = public_root / profile_key / public_asset_key
-        staging_dir = public_root / profile_key / f".{public_asset_key}.staging-{hashlib.sha1(str(time.time()).encode()).hexdigest()[:8]}"
-        staging_dir.mkdir(parents=True, exist_ok=False)
         try:
-            shutil.copy2(page, staging_dir / "index.html")
-            if final_dir.exists():
-                shutil.rmtree(final_dir)
-            os.replace(staging_dir, final_dir)
-        finally:
-            if staging_dir.exists():
-                shutil.rmtree(staging_dir, ignore_errors=True)
-        public_url = f"{base_url}/{profile_key}/{public_asset_key}/"
-        verify_base = (_runtime_setting("FEYNMAN_H5_VERIFY_BASE_URL") or base_url).rstrip("/")
-        verify_url = f"{verify_base}/{profile_key}/{public_asset_key}/"
-        try:
+            public_root, base_url = _h5_public_config()
+            profile_key = _public_profile_key()
+            public_asset_key = "h5_" + hashlib.sha256(meta["asset_id"].encode("utf-8")).hexdigest()[:20]
+            final_dir = public_root / profile_key / public_asset_key
+            staging_dir = public_root / profile_key / f".{public_asset_key}.staging-{hashlib.sha1(str(time.time()).encode()).hexdigest()[:8]}"
+            staging_dir.mkdir(parents=True, exist_ok=False)
+            try:
+                shutil.copy2(page, staging_dir / "index.html")
+                if final_dir.exists():
+                    shutil.rmtree(final_dir)
+                os.replace(staging_dir, final_dir)
+            finally:
+                if staging_dir.exists():
+                    shutil.rmtree(staging_dir, ignore_errors=True)
+            public_url = f"{base_url}/{profile_key}/{public_asset_key}/"
+            verify_base = (_runtime_setting("FEYNMAN_H5_VERIFY_BASE_URL") or base_url).rstrip("/")
+            verify_url = f"{verify_base}/{profile_key}/{public_asset_key}/"
             with urlopen(verify_url, timeout=10) as response:
                 if int(getattr(response, "status", 200)) != 200:
                     raise URLError("unexpected_status")
+            meta.update({"status": "public_verified", "public_url": public_url, "published_at": _now()})
+            (_assets_dir() / meta["asset_id"] / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+            return json.dumps({"success": True, "asset_id": meta["asset_id"], "student_deliverable_ready": True, "delivery_mode": "public_link", "public_url": public_url, "student_message": f"我给你准备了一个小互动页《{meta['title']}》。点击链接操作一下；完成后回到聊天，用自己的话告诉我：{meta['prompt_back']}"}, ensure_ascii=False)
         except Exception:
-            shutil.rmtree(final_dir, ignore_errors=True)
-            return _safe_fail("h5_link_unverified", "互动页暂时不能稳定打开，我先继续用文字带你学。", student_deliverable_ready=False)
-        meta.update({"status": "public_verified", "public_url": public_url, "published_at": _now()})
-        (_assets_dir() / meta["asset_id"] / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
-        return json.dumps({"success": True, "asset_id": meta["asset_id"], "student_deliverable_ready": True, "public_url": public_url, "student_message": f"我给你准备了一个小互动页《{meta['title']}》。点击链接操作一下；完成后回到聊天，用自己的话告诉我：{meta['prompt_back']}"}, ensure_ascii=False)
+            if final_dir is not None:
+                shutil.rmtree(final_dir, ignore_errors=True)
+            return _h5_attachment_fallback(page, meta)
     except Exception:
-        return _safe_fail("h5_publish_failed", "互动页暂时不能稳定打开，我先继续用文字带你学。", student_deliverable_ready=False)
+        if page is not None and page.is_file() and meta:
+            return _h5_attachment_fallback(page, meta)
+        return _safe_fail("h5_publish_failed", "互动页暂时不能生成，我先继续用文字带你学。", student_deliverable_ready=False)
 
 
 def feynman_check_visual_asset(args: dict, **kwargs) -> str:

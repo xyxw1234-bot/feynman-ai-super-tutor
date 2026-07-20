@@ -30,7 +30,7 @@ hermes skills install https://raw.githubusercontent.com/xyxw1234-bot/feynman-ai-
 hermes plugins install xyxw1234-bot/feynman-ai-super-tutor/plugins/feynman_super_tutor --force --enable
 ```
 
-3. 自动识别当前 Hermes 所在服务器并准备 H5 受控静态入口；仅在服务器具备 Nginx 与系统权限时自动配置。配置不了时静默失败，H5 发布工具会自动退回文字/图示教学，绝不发送文件附件或假链接：
+3. 自动识别当前 Hermes 所在服务器并准备 H5 受控静态入口；仅在服务器具备 Nginx 与系统权限时自动配置。配置不了时不向学生解释技术原因：H5 发布工具会先尝试链接交付，若已通过内容检查但链接无法验证，则直接发送原生 HTML 文件附件作为兜底；绝不发送假链接：
 
 ```bash
 python3 "${HERMES_HOME:-$HOME/.hermes}/plugins/feynman_super_tutor/scripts/provision_h5_host.py" || true
@@ -162,14 +162,14 @@ python3 "${HERMES_HOME:-$HOME/.hermes}/plugins/feynman_super_tutor/scripts/provi
 - 不做大而全页面；
 - 不把素材当最终答案；
 - 不发未经检查的链接；
-- 不发送 HTML 文件附件、本地文件路径或“先下载再打开”的替代品；
-- H5 只能发布到当前用户 Hermes 所在服务器的受控 `/feynman-h5/` 静态入口；链接必须使用匿名随机页面 ID，不含姓名、主题、本地路径或学习档案信息；
-- 必须先调用 `feynman_publish_interactive_h5`；只有返回 `student_deliverable_ready=true` 与 `public_url`、并已完成 HTTP 200 回读时，才能发给学生；否则继续文字/图示教学；
+- 优先把 H5 发布为可点击链接；链接必须使用匿名随机页面 ID，不含姓名、主题、本地路径或学习档案信息；
+- 必须先调用 `feynman_publish_interactive_h5`：返回 `delivery_mode=public_link` 时发送 `public_url`；返回 `delivery_mode=html_attachment` 时立刻以平台原生附件发送 `attachment_path` 指向的 HTML 文件。附件路径只能用于平台上传，绝不作为文字显示给学生；
+- 不因发布失败向学生解释服务器、部署、路径或技术原因；已检查 H5 的唯一兜底是原生 HTML 附件，H5 本身未通过检查才继续文字/图示教学；
 - 不使用版权不明素材；
 - 不出现内部路径、命令、日志、测试话术或技术痕迹；
 - 数学图像、物理方向、化学粒子和实验步骤必须做学科正确性复核。
 
-H5 必须具备：浅色背景、移动端优先、一个明确学习目标、真实可操作控件、即时反馈、观察任务、回到聊天复述的问题。发出时只给学生一段友好说明和链接，例如“我给你准备了一个小互动页，点击链接操作一下；完成后回来讲给我听。”绝不发送附件。发出后必须把学生拉回费曼回讲：
+H5 必须具备：浅色背景、移动端优先、一个明确学习目标、真实可操作控件、即时反馈、观察任务、回到聊天复述的问题。发出时只给学生一段友好说明和交付物：优先给链接；链接不可用但 H5 已检查通过时发送原生 HTML 附件。绝不展示附件路径。发出后必须把学生拉回费曼回讲：
 
 “你拖动后观察到了什么？现在不用看页面，用自己的话讲给我听。”
 
