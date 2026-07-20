@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 REQUIRED = [
     "SKILL.md", "README.md", "INSTALL.md", "CHANGELOG.md", "LICENSE",
     "plugins/feynman_super_tutor/plugin.yaml", "plugins/feynman_super_tutor/__init__.py",
-    "plugins/feynman_super_tutor/schemas.py", "plugins/feynman_super_tutor/tools.py",
+    "plugins/feynman_super_tutor/schemas.py", "plugins/feynman_super_tutor/tools.py", "plugins/feynman_super_tutor/scripts/provision_h5_host.py",
     "references/visual-interactive-learning.md", "templates/h5-brief.md",
     "references/subject-training-and-resource-policy.md", "references/visual-asset-delivery-qa.md", "references/broad-learning-companion-protocol.md", "references/china-k12-official-curriculum-source-map.md", "templates/practice-set.md", "templates/study-plan.md", "templates/exam-paper-blueprint.md", "templates/learning-report.md",
 ]
@@ -28,7 +28,7 @@ if len(skill) > 100000:
     fail("SKILL.md too large")
 for needle in [
     "name: feynman-ai-super-tutor",
-    "version: 1.3.5",
+    "version: 1.3.5.1",
     "## 零、自动安装与启用协议",
     "视觉互动增强协议",
     "学科训练与提分增强协议",
@@ -41,6 +41,7 @@ for needle in [
     "feynman_generate_practice_set",
     "feynman_assess_visual_need",
     "feynman_create_interactive_h5",
+    "feynman_publish_interactive_h5",
     "feynman_check_visual_asset",
     "版权",
     "未成年人",
@@ -53,8 +54,8 @@ if "hermes plugins install xyxw1234-bot/feynman-ai-super-tutor/plugins/feynman_s
     fail("plugin install command missing")
 
 plugin_yaml = (ROOT / "plugins/feynman_super_tutor/plugin.yaml").read_text(encoding="utf-8")
-if 'version: "1.3.5"' not in plugin_yaml:
-    fail("plugin version not v1.3.5")
+if 'version: "1.3.5.1"' not in plugin_yaml:
+    fail("plugin version not v1.3.5.1")
 for tool_name in ["feynman_map_subject_training", "feynman_plan_resource_lookup", "feynman_check_resource_source",
     "feynman_align_curriculum_topic", "feynman_generate_learning_report", "feynman_generate_practice_set", "feynman_save_practice_attempt", "feynman_triage_broad_learning_goal", "feynman_plan_curriculum_lookup", "feynman_generate_subject_study_plan", "feynman_generate_exam_paper_blueprint"]:
     if tool_name not in plugin_yaml:
@@ -124,11 +125,13 @@ with tempfile.TemporaryDirectory() as td:
     generated = json.loads(tools.feynman_create_interactive_h5({"title": "浮力互动小实验", "subject": "物理", "topic": "浮力", "learning_goal": "观察液体密度和排开体积对浮力的影响", "interaction_type": "buoyancy"}))
     if not generated.get("success"):
         fail("h5 generation failed")
-    check = json.loads(tools.feynman_check_visual_asset({"file_path": generated["internal_only"]["file_path"], "expected_interactions": ["rho", "vol"]}))
+    if "file_path" in json.dumps(generated, ensure_ascii=False):
+        fail("h5 generation leaked a local file path")
+    check = json.loads(tools.feynman_check_visual_asset({"asset_id": generated["asset_id"], "expected_interactions": ["rho", "vol"]}))
     if not check.get("passed"):
         fail(f"h5 static check failed: {check}")
     generic = json.loads(tools.feynman_create_interactive_h5({"title": "通用互动", "topic": "未知主题", "learning_goal": "测试", "interaction_type": "generic_slider"}))
-    generic_check = json.loads(tools.feynman_check_visual_asset({"file_path": generic["internal_only"]["file_path"]}))
+    generic_check = json.loads(tools.feynman_check_visual_asset({"asset_id": generic["asset_id"]}))
     if generic_check.get("passed") or not generic.get("requires_subject_customization"):
         fail("generic H5 should not pass student-ready QA")
     assets = json.loads(tools.feynman_list_visual_assets({"topic": "浮力"}))

@@ -12,6 +12,7 @@ def register(ctx):
         ("feynman_assess_visual_need", schemas.VISUAL_NEED_ASSESS, tools.feynman_assess_visual_need),
         ("feynman_generate_interactive_h5_brief", schemas.INTERACTIVE_H5_BRIEF, tools.feynman_generate_interactive_h5_brief),
         ("feynman_create_interactive_h5", schemas.CREATE_INTERACTIVE_H5, tools.feynman_create_interactive_h5),
+        ("feynman_publish_interactive_h5", schemas.PUBLISH_INTERACTIVE_H5, tools.feynman_publish_interactive_h5),
         ("feynman_check_visual_asset", schemas.VISUAL_ASSET_CHECK, tools.feynman_check_visual_asset),
         ("feynman_list_visual_assets", schemas.LIST_VISUAL_ASSETS, tools.feynman_list_visual_assets),
         ("feynman_map_subject_training", schemas.SUBJECT_MAP, tools.feynman_map_subject_training),

@@ -1,7 +1,7 @@
 ---
 name: feynman-ai-super-tutor
 description: Use when a user wants the agent to become a Feynman-style AI learning companion for K12, university, professional learning, textbook study, exam preparation, material digestion, knowledge-gap diagnosis, and long-term learning records. The skill makes the learner explain first, uses targeted questioning to expose gaps, teaches only at the learner's edge, and saves user-confirmed learning notes, can judge when a diagram or tested interactive H5 learning asset is needed, and adds China K12 subject training, curriculum/textbook-aware study planning, exam preparation, paper generation, legal resource indexing, and score-improvement learning loops.
-version: 1.3.5
+version: 1.3.5.1
 author: Node Engine + contributors, adapted from koukekoukej-glitch/feynman-tutor
 license: MIT
 metadata:
@@ -30,9 +30,15 @@ hermes skills install https://raw.githubusercontent.com/xyxw1234-bot/feynman-ai-
 hermes plugins install xyxw1234-bot/feynman-ai-super-tutor/plugins/feynman_super_tutor --force --enable
 ```
 
-3. 如当前是网关/飞书智能体，提示或执行受控重启，使新 Skill/插件在新会话生效；不要泄露密钥、路径、日志或内部命令给普通用户。
+3. 自动识别当前 Hermes 所在服务器并准备 H5 受控静态入口；仅在服务器具备 Nginx 与系统权限时自动配置。配置不了时静默失败，H5 发布工具会自动退回文字/图示教学，绝不发送文件附件或假链接：
 
-4. 安装完成后必须主动给用户发送一段简短介绍和使用建议，内容包括：
+```bash
+python3 "${HERMES_HOME:-$HOME/.hermes}/plugins/feynman_super_tutor/scripts/provision_h5_host.py" || true
+```
+
+4. 如当前是网关/飞书智能体，提示或执行受控重启，使新 Skill/插件与 H5 发布配置在新会话生效；不要泄露密钥、路径、日志或内部命令给普通用户。
+
+5. 安装完成后必须主动给用户发送一段简短介绍和使用建议，内容包括：
    - 已启用“费曼AI超级学习导师”；
    - 以后默认不是直接灌答案，而是让用户先讲、AI 追问、诊断盲点、补强关键一步；数理化等图示密集场景会判断是否需要配图或互动H5；
    - 给出 4 个可直接复制的开场例子；
@@ -156,11 +162,14 @@ hermes plugins install xyxw1234-bot/feynman-ai-super-tutor/plugins/feynman_super
 - 不做大而全页面；
 - 不把素材当最终答案；
 - 不发未经检查的链接；
+- 不发送 HTML 文件附件、本地文件路径或“先下载再打开”的替代品；
+- H5 只能发布到当前用户 Hermes 所在服务器的受控 `/feynman-h5/` 静态入口；链接必须使用匿名随机页面 ID，不含姓名、主题、本地路径或学习档案信息；
+- 必须先调用 `feynman_publish_interactive_h5`；只有返回 `student_deliverable_ready=true` 与 `public_url`、并已完成 HTTP 200 回读时，才能发给学生；否则继续文字/图示教学；
 - 不使用版权不明素材；
 - 不出现内部路径、命令、日志、测试话术或技术痕迹；
 - 数学图像、物理方向、化学粒子和实验步骤必须做学科正确性复核。
 
-H5 必须具备：浅色背景、移动端优先、一个明确学习目标、真实可操作控件、即时反馈、观察任务、回到聊天复述的问题。发出后必须把学生拉回费曼回讲：
+H5 必须具备：浅色背景、移动端优先、一个明确学习目标、真实可操作控件、即时反馈、观察任务、回到聊天复述的问题。发出时只给学生一段友好说明和链接，例如“我给你准备了一个小互动页，点击链接操作一下；完成后回来讲给我听。”绝不发送附件。发出后必须把学生拉回费曼回讲：
 
 “你拖动后观察到了什么？现在不用看页面，用自己的话讲给我听。”
 

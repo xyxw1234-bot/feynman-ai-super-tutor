@@ -4,7 +4,10 @@ import os
 import re
 import time
 import hashlib
+import shutil
 from pathlib import Path
+from urllib.error import URLError
+from urllib.request import urlopen
 
 
 def _home() -> Path:
@@ -305,18 +308,88 @@ def feynman_create_interactive_h5(args: dict, **kwargs) -> str:
         d.mkdir(parents=True, exist_ok=True)
         html_path = d / "index.html"
         html_path.write_text(page, encoding="utf-8")
-        meta = {"created_at": _now(), "asset_id": asset_id, "title": title, "subject": subject, "grade": grade, "topic": topic, "interaction_type": it, "file_path": str(html_path), "prompt_back": prompt, "status": "local_generated_needs_preview_and_public_deploy"}
+        meta = {"created_at": _now(), "asset_id": asset_id, "title": title, "subject": subject, "grade": grade, "topic": topic, "interaction_type": it, "file_path": str(html_path), "prompt_back": prompt, "status": "local_generated_needs_public_publish"}
         (d / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
         _append_jsonl(_asset_index_path(), meta)
         requires_customization = it not in {"linear_function", "function_graph", "quadratic_function", "buoyancy", "force_diagram", "circuit", "chemistry_particles"}
-        return json.dumps({"success": True, "asset_id": asset_id, "student_deliverable_ready": False, "public_url": None, "do_not_send_to_student": True, "requires_subject_customization": requires_customization, "internal_only": {"file_path": str(html_path), "meta_path": str(d / "meta.json"), "next_required_steps": ["run feynman_check_visual_asset", "open the HTML in a real browser", "test phone width and all controls", "deploy to a stable public URL before sending", "ask the learner to return and explain observations"]}}, ensure_ascii=False)
+        return json.dumps({"success": True, "asset_id": asset_id, "title": title, "student_deliverable_ready": False, "requires_subject_customization": requires_customization, "next_action": "请调用 feynman_publish_interactive_h5；未获得 verified public_url 前，绝不发送文件附件或本地路径。"}, ensure_ascii=False)
     except Exception as e:
         return _safe_fail()
 
 
+def _local_asset_path(asset_id: str) -> tuple[Path, dict]:
+    safe_id = (asset_id or "").strip()
+    if not re.fullmatch(r"[a-zA-Z0-9_\-\u4e00-\u9fff]{1,100}", safe_id):
+        raise ValueError("invalid_asset")
+    asset_dir = _assets_dir() / safe_id
+    page = asset_dir / "index.html"
+    meta_path = asset_dir / "meta.json"
+    if not page.is_file() or not meta_path.is_file():
+        raise FileNotFoundError("asset_not_found")
+    return page, json.loads(meta_path.read_text(encoding="utf-8"))
+
+
+def _h5_public_config() -> tuple[Path, str]:
+    root = (os.environ.get("FEYNMAN_H5_PUBLIC_DIR") or "").strip()
+    base_url = (os.environ.get("FEYNMAN_H5_PUBLIC_BASE_URL") or "").strip().rstrip("/")
+    if not root or not re.fullmatch(r"https?://[^\s]+", base_url):
+        raise RuntimeError("public_delivery_not_configured")
+    public_root = Path(root).expanduser().resolve()
+    public_root.mkdir(parents=True, exist_ok=True)
+    if not os.access(public_root, os.W_OK):
+        raise PermissionError("public_delivery_not_writable")
+    return public_root, base_url
+
+
+def _public_profile_key() -> str:
+    return hashlib.sha256(str(_home().resolve()).encode("utf-8")).hexdigest()[:16]
+
+
+def feynman_publish_interactive_h5(args: dict, **kwargs) -> str:
+    """Publish one checked H5 page and return a link only after a live 200 read-back."""
+    try:
+        page, meta = _local_asset_path(str(args.get("asset_id") or ""))
+        static = json.loads(feynman_check_visual_asset({"file_path": str(page)}))
+        if not static.get("passed") or meta.get("interaction_type") == "generic_slider":
+            return _safe_fail("h5_not_ready", "这个互动页还不适合直接打开，我先继续用文字带你学。", student_deliverable_ready=False)
+        public_root, base_url = _h5_public_config()
+        profile_key = _public_profile_key()
+        public_asset_key = "h5_" + hashlib.sha256(meta["asset_id"].encode("utf-8")).hexdigest()[:20]
+        final_dir = public_root / profile_key / public_asset_key
+        staging_dir = public_root / profile_key / f".{public_asset_key}.staging-{hashlib.sha1(str(time.time()).encode()).hexdigest()[:8]}"
+        staging_dir.mkdir(parents=True, exist_ok=False)
+        try:
+            shutil.copy2(page, staging_dir / "index.html")
+            if final_dir.exists():
+                shutil.rmtree(final_dir)
+            os.replace(staging_dir, final_dir)
+        finally:
+            if staging_dir.exists():
+                shutil.rmtree(staging_dir, ignore_errors=True)
+        public_url = f"{base_url}/{profile_key}/{public_asset_key}/"
+        verify_base = (os.environ.get("FEYNMAN_H5_VERIFY_BASE_URL") or base_url).strip().rstrip("/")
+        verify_url = f"{verify_base}/{profile_key}/{public_asset_key}/"
+        try:
+            with urlopen(verify_url, timeout=10) as response:
+                if int(getattr(response, "status", 200)) != 200:
+                    raise URLError("unexpected_status")
+        except Exception:
+            shutil.rmtree(final_dir, ignore_errors=True)
+            return _safe_fail("h5_link_unverified", "互动页暂时不能稳定打开，我先继续用文字带你学。", student_deliverable_ready=False)
+        meta.update({"status": "public_verified", "public_url": public_url, "published_at": _now()})
+        (_assets_dir() / meta["asset_id"] / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+        return json.dumps({"success": True, "asset_id": meta["asset_id"], "student_deliverable_ready": True, "public_url": public_url, "student_message": f"我给你准备了一个小互动页《{meta['title']}》。点击链接操作一下；完成后回到聊天，用自己的话告诉我：{meta['prompt_back']}"}, ensure_ascii=False)
+    except Exception:
+        return _safe_fail("h5_publish_failed", "互动页暂时不能稳定打开，我先继续用文字带你学。", student_deliverable_ready=False)
+
+
 def feynman_check_visual_asset(args: dict, **kwargs) -> str:
     try:
-        p = Path(args.get("file_path") or "")
+        requested_path = (args.get("file_path") or "").strip()
+        if requested_path:
+            p = Path(requested_path)
+        else:
+            p, _ = _local_asset_path(str(args.get("asset_id") or ""))
         if not p.exists():
             return json.dumps({"success": False, "passed": False, "errors": ["file_not_found"]}, ensure_ascii=False)
         text = p.read_text(encoding="utf-8", errors="ignore")

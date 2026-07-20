@@ -23,16 +23,16 @@ skill=(ROOT/'SKILL.md').read_text(encoding='utf-8')
 plugin=(ROOT/'plugins/feynman_super_tutor/plugin.yaml').read_text(encoding='utf-8')
 
 # 1. Public surface checks
-for needle in ['version: 1.3.5','超级学伴宽入口协议','学科训练与提分增强协议','轻问诊与高效提分体验协议','官方课程教材定位与知识点对齐协议','快速定位与性能协议','学习报告与阶段评估协议','空白图片与假交付事故防线','视觉互动增强协议']:
+for needle in ['version: 1.3.5.1','超级学伴宽入口协议','学科训练与提分增强协议','轻问诊与高效提分体验协议','官方课程教材定位与知识点对齐协议','快速定位与性能协议','学习报告与阶段评估协议','空白图片与假交付事故防线','视觉互动增强协议']:
     check(needle in skill, f'SKILL missing {needle}')
 for bad in ['保证'+'提分','盗版'+'教材库','YOUR'+'_TOKEN','api'+'_key=','TO'+'DO']:
     check(bad not in skill, f'bad term in SKILL: {bad}')
-check('version: "1.3.5"' in plugin, 'plugin manifest not v1.3.5')
-for tool_name in ['feynman_triage_broad_learning_goal','feynman_plan_curriculum_lookup','feynman_generate_subject_study_plan','feynman_generate_exam_paper_blueprint','feynman_check_resource_source','feynman_align_curriculum_topic','feynman_generate_learning_report','feynman_check_visual_asset']:
+check('version: "1.3.5.1"' in plugin, 'plugin manifest not v1.3.5.1')
+for tool_name in ['feynman_triage_broad_learning_goal','feynman_plan_curriculum_lookup','feynman_generate_subject_study_plan','feynman_generate_exam_paper_blueprint','feynman_check_resource_source','feynman_align_curriculum_topic','feynman_generate_learning_report','feynman_create_interactive_h5','feynman_publish_interactive_h5','feynman_check_visual_asset']:
     check(tool_name in skill and tool_name in plugin, f'tool not public-listed: {tool_name}')
 
 # 2. Schema registration shape
-for name in ['BROAD_GOAL_TRIAGE','CURRICULUM_LOOKUP_PLAN','STUDY_PLAN','PAPER_BLUEPRINT','RESOURCE_SOURCE_CHECK','CURRICULUM_TOPIC_ALIGN','LEARNING_REPORT','VISUAL_ASSET_CHECK']:
+for name in ['BROAD_GOAL_TRIAGE','CURRICULUM_LOOKUP_PLAN','STUDY_PLAN','PAPER_BLUEPRINT','RESOURCE_SOURCE_CHECK','CURRICULUM_TOPIC_ALIGN','LEARNING_REPORT','CREATE_INTERACTIVE_H5','PUBLISH_INTERACTIVE_H5','VISUAL_ASSET_CHECK']:
     check(hasattr(schemas, name), f'schema missing {name}')
 
 # 3. Tool scenarios
@@ -112,17 +112,16 @@ check(len(s7.get('items',[]))>=2, 'practice set too small')
 
 # H5 generation/static QA/blank guard
 h5=call('h5_generate', tools.feynman_create_interactive_h5, {'title':'浮力互动小实验','subject':'物理','topic':'浮力','learning_goal':'观察液体密度和排开体积对浮力的影响','interaction_type':'buoyancy'})
-file_path=h5.get('internal_only',{}).get('file_path','')
-check(file_path and Path(file_path).exists(), 'H5 file not generated')
-qa=call('h5_static_check', tools.feynman_check_visual_asset, {'file_path':file_path,'expected_interactions':['rho','vol']})
+check(h5.get('asset_id') and 'file_path' not in json.dumps(h5, ensure_ascii=False), 'H5 create leaked local file data')
+qa=call('h5_static_check', tools.feynman_check_visual_asset, {'asset_id':h5.get('asset_id',''),'expected_interactions':['rho','vol']})
 check(qa.get('passed') is True, f'H5 static QA failed: {qa}')
 
 generic=call('h5_generic_generate', tools.feynman_create_interactive_h5, {'title':'通用互动','topic':'未知主题','learning_goal':'测试','interaction_type':'generic_slider'})
-generic_file=generic.get('internal_only',{}).get('file_path','')
-generic_qa=call('h5_generic_static_check', tools.feynman_check_visual_asset, {'file_path':generic_file}, expect_success=True)
+generic_qa=call('h5_generic_static_check', tools.feynman_check_visual_asset, {'asset_id':generic.get('asset_id','')}, expect_success=True)
 check(generic.get('requires_subject_customization') is True and generic_qa.get('passed') is False, 'generic H5 should require customization and fail final QA')
-if file_path and Path(file_path).exists():
-    html=Path(file_path).read_text(encoding='utf-8')
+page_path, _ = tools._local_asset_path(h5.get('asset_id',''))
+if page_path.exists():
+    html=page_path.read_text(encoding='utf-8')
     for term in ['write_file','browser_navigate','/opt/data','TO'+'DO','debug']:
         check(term not in html, f'H5 leaks internal term: {term}')
     check(len(re.sub(r'<[^>]+>','',html).strip())>80, 'H5 appears text-empty')
